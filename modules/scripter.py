@@ -118,7 +118,7 @@ class ScriptGenerator:
         """Build the prompt for script generation."""
         topic_context = f"Topic: {topic}\n" if topic else ""
 
-        return f"""You are a YouTube script writer creating engaging, persuasive narration for a tutorial video.
+        return f"""You're writing a YouTube tutorial script. Your job is to sound like a real person talking to a friend, not a robot or corporate presenter.
 
 {topic_context}URL being demonstrated: {url}
 Total video duration: {duration:.1f} seconds
@@ -126,35 +126,74 @@ Total video duration: {duration:.1f} seconds
 RECORDED ACTIONS (with timestamps):
 {actions}
 
-Generate a narration script that:
-1. Opens with a compelling hook (first 5-10 seconds)
-2. Matches the timing of each action shown
-3. Uses conversational, authoritative tone
-4. Includes natural pauses for visual comprehension
-5. Ends with a clear call-to-action
+VOICE & STYLE RULES:
+
+1. SOUND HUMAN - Write like you talk:
+   - Use contractions: "you're", "it's", "don't", "gonna", "wanna"
+   - Start sentences with "So", "Now", "Okay", "Alright", "Look"
+   - Use filler phrases naturally: "honestly", "basically", "pretty much", "real quick"
+   - React genuinely: "this is sick", "super clean", "lowkey amazing", "no cap this works"
+
+2. BANNED AI PHRASES - Never use these:
+   - "Let's dive in" / "dive into"
+   - "In this video"
+   - "Welcome back"
+   - "Without further ado"
+   - "It's important to note"
+   - "As you can see"
+   - "Simply" / "Just simply"
+   - "Leverage" / "Utilize"
+   - "Robust" / "Seamless" / "Cutting-edge"
+   - "Game-changer" / "Revolutionary"
+   - "Take it to the next level"
+   - "Here's the thing"
+   - Any phrase that sounds like a LinkedIn post
+
+3. HOOK FORMULA (first 5-10 seconds):
+   - Start mid-thought like you're already talking
+   - Create curiosity or call out a pain point
+   - Examples:
+     * "Okay so I just found something that's gonna save you hours..."
+     * "Bro. Why did nobody tell me about this earlier?"
+     * "Stop doing it the hard way. There's a better move."
+     * "You know that annoying thing where [problem]? Fixed."
+
+4. BODY STYLE:
+   - Short punchy sentences. Like this. Keep it moving.
+   - When showing a step: "Now watch this" or "Check this out" or "Here's the move"
+   - When something works: "Boom." or "There it is." or "See that?"
+   - Explain WHY not just what: "This matters because..."
+   - Add personality: "I actually use this daily" or "This one's clutch"
+
+5. OUTRO (call-to-action):
+   - Keep it casual, not desperate
+   - Examples:
+     * "If this helped, sub's free. More stuff like this coming."
+     * "Drop a comment if you want me to cover [related topic]"
+     * "Alright that's it. Go try it."
 
 OUTPUT FORMAT (JSON):
 {{
-    "title": "Video title for YouTube",
-    "hook": "Opening hook text (5-10 seconds of speech)",
+    "title": "Catchy YouTube title (use numbers, 'how to', or curiosity gaps)",
+    "hook": "Opening hook - mid-conversation energy, 5-10 seconds of speech",
     "segments": [
         {{
             "start_time": 0.0,
             "end_time": 5.0,
-            "text": "Narration text for this segment",
+            "text": "Natural narration for this segment",
             "emphasis": "excited|normal|thoughtful"
         }}
     ],
-    "outro": "Closing call-to-action text"
+    "outro": "Casual CTA that doesn't sound needy"
 }}
 
-IMPORTANT:
-- Each segment should be 5-15 seconds of speech
-- Leave brief pauses (1-2s) during complex visual actions
-- Total speech time should be ~80% of video duration
-- Be specific about what's shown, not generic
+TIMING RULES:
+- Each segment: 5-15 seconds of speech
+- Leave 1-2s pauses during complex visuals (let them breathe)
+- Total speech: ~80% of video duration
+- Match energy to what's happening on screen
 
-Generate the JSON script now:"""
+Generate the JSON script. Sound like a real YouTuber, not a tutorial bot:"""
 
     def _parse_script_response(self, response: str, project_id: str,
                                 duration: float) -> GeneratedScript:
@@ -201,19 +240,19 @@ Generate the JSON script now:"""
 
         return GeneratedScript(
             project_id=project_id,
-            title=f"Tutorial: {project_id}",
-            hook="Welcome to this quick tutorial. Let me show you something useful.",
+            title=f"You Need to See This | Quick Tutorial",
+            hook="Okay so check this out real quick. Found something you're gonna wanna know about.",
             segments=[
                 ScriptSegment(0, segment_duration,
-                             "Here's what we're looking at today.", "normal"),
+                             "Alright so here's what we're working with.", "normal"),
                 ScriptSegment(segment_duration, segment_duration * 2,
-                             "Watch how this works in practice.", "normal"),
+                             "Now watch this part. This is the move right here.", "normal"),
                 ScriptSegment(segment_duration * 2, duration,
-                             "And that's the key takeaway.", "normal")
+                             "And boom. That's pretty much it. Super clean.", "normal")
             ],
-            outro="If this helped, subscribe for more tutorials like this.",
+            outro="If this helped, sub's free. Got more stuff like this coming.",
             total_duration=duration,
-            word_count=50
+            word_count=60
         )
 
 
