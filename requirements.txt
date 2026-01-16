@@ -1,0 +1,23 @@
+# Browser automation
+playwright>=1.40.0
+
+# AI/ML
+openai>=1.0.0
+anthropic>=0.18.0
+
+# Video processing
+ffmpeg-python>=0.2.0
+
+# News discovery
+tavily-python>=0.3.0
+
+# YouTube
+google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+rich>=13.0.0
+click>=8.1.0
+aiofiles>=23.0.0

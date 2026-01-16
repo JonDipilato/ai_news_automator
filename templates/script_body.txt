@@ -1,0 +1,23 @@
+NARRATION STYLE GUIDE:
+- Conversational but authoritative
+- Short, punchy sentences
+- Active voice
+- Specific over generic
+- Match timing to visual actions
+
+SEGMENT STRUCTURE:
+[Action Happens] -> Describe what viewer sees
+[Pause] -> Let complex visuals breathe
+[Insight] -> Add value beyond the obvious
+[Transition] -> Connect to next action
+
+EMPHASIS MARKERS:
+- "excited": Use for reveals, results, key features
+- "normal": Standard explanatory content
+- "thoughtful": Complex concepts, considerations
+
+TIMING RULES:
+- 150 words = ~1 minute of speech
+- Leave 1-2 second gaps during fast UI changes
+- Front-load key points in each segment
+- End segments with forward momentum

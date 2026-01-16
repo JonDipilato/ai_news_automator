@@ -1,0 +1,13 @@
+{hook}
+
+In this video:
+{bullet_points}
+
+TIMESTAMPS:
+{timestamps}
+
+---
+
+{outro}
+
+#AI #Tutorial #Technology

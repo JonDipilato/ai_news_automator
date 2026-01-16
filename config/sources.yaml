@@ -1,0 +1,91 @@
+# News sources for AI/tech content discovery
+# Used by modules/discovery.py
+
+sources:
+  # High-signal tech news
+  - name: Hacker News
+    type: api
+    url: https://hacker-news.firebaseio.com/v0
+    categories: [ai, ml, programming, startups]
+    priority: high
+
+  - name: Product Hunt
+    type: api
+    url: https://api.producthunt.com/v2/api/graphql
+    categories: [ai-tools, developer-tools]
+    priority: high
+
+  # AI-specific sources
+  - name: AI News
+    type: rss
+    url: https://www.artificialintelligence-news.com/feed/
+    categories: [ai, ml, research]
+    priority: medium
+
+  - name: OpenAI Blog
+    type: rss
+    url: https://openai.com/blog/rss.xml
+    categories: [ai, gpt, research]
+    priority: high
+
+  - name: Anthropic Research
+    type: web
+    url: https://www.anthropic.com/research
+    categories: [ai, claude, safety]
+    priority: high
+
+  # Developer tools and tutorials
+  - name: Dev.to AI
+    type: rss
+    url: https://dev.to/feed/tag/ai
+    categories: [ai, tutorials, programming]
+    priority: medium
+
+  - name: GitHub Trending
+    type: api
+    url: https://api.github.com/search/repositories
+    query: "ai OR llm OR gpt"
+    categories: [ai, open-source, tools]
+    priority: medium
+
+# Search queries for Tavily
+tavily_queries:
+  ai_tools:
+    - "new AI tool launch"
+    - "AI productivity app"
+    - "AI code assistant"
+    - "LLM application tutorial"
+
+  tutorials:
+    - "how to use Claude AI"
+    - "ChatGPT tutorial guide"
+    - "AI automation workflow"
+    - "prompt engineering tips"
+
+  news:
+    - "AI breakthrough research"
+    - "OpenAI announcement"
+    - "Anthropic Claude update"
+    - "AI startup funding"
+
+# Content filters
+filters:
+  # Skip these topics
+  exclude_keywords:
+    - "crypto"
+    - "nft"
+    - "blockchain"
+    - "web3"
+
+  # Prioritize these
+  boost_keywords:
+    - "tutorial"
+    - "how to"
+    - "guide"
+    - "tips"
+    - "workflow"
+    - "automation"
+
+  # Minimum engagement for social sources
+  min_upvotes: 50
+  min_comments: 10

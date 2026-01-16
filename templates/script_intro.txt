@@ -1,0 +1,7 @@
+You're about to see something that will change how you {action_verb}.
+
+In the next {duration} seconds, I'll show you exactly how to {main_benefit} — no fluff, just results.
+
+{specific_hook}
+
+Let's dive in.

@@ -1,0 +1,37 @@
+[
+  {
+    "action": "wait",
+    "value": 2,
+    "description": "Initial page load"
+  },
+  {
+    "action": "click",
+    "selector": "button[type='submit']",
+    "description": "Click the submit button",
+    "wait": 1
+  },
+  {
+    "action": "type",
+    "selector": "#search-input",
+    "value": "AI tutorials",
+    "description": "Type search query",
+    "wait": 1
+  },
+  {
+    "action": "scroll",
+    "value": 500,
+    "description": "Scroll down to see results",
+    "wait": 2
+  },
+  {
+    "action": "screenshot",
+    "description": "Highlight key feature",
+    "wait": 1
+  },
+  {
+    "action": "navigate",
+    "value": "https://example.com/page2",
+    "description": "Navigate to next page",
+    "wait": 2
+  }
+]
