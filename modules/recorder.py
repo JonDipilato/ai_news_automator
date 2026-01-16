@@ -66,7 +66,7 @@ class BrowserRecorder:
         timestamps_file = RECORDINGS_DIR / f"{project_id}_timestamps.json"
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=False)
+            browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
                 viewport={"width": VIDEO_WIDTH, "height": VIDEO_HEIGHT},
                 record_video_dir=str(RECORDINGS_DIR),

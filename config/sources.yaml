@@ -51,21 +51,27 @@ sources:
 # Search queries for Tavily
 tavily_queries:
   ai_tools:
-    - "new AI tool launch"
-    - "AI productivity app"
-    - "AI code assistant"
-    - "LLM application tutorial"
+    - "new AI tool 2025"
+    - "AI productivity app launch"
+    - "best AI coding assistant"
+    - "AI agent framework"
+    - "open source AI model release"
 
   tutorials:
-    - "how to use Claude AI"
-    - "ChatGPT tutorial guide"
     - "AI automation workflow"
-    - "prompt engineering tips"
+    - "prompt engineering guide"
+    - "build AI agent"
+    - "LLM integration tutorial"
 
   news:
-    - "AI breakthrough research"
-    - "OpenAI announcement"
-    - "Anthropic Claude update"
+    - "DeepSeek AI news"
+    - "Qwen Alibaba AI model"
+    - "Mistral AI announcement"
+    - "Google Gemini news"
+    - "AI research breakthrough 2025"
+    - "Meta Llama update"
+    - "computer vision AI"
+    - "robotics AI news"
     - "AI startup funding"
 
 # Content filters

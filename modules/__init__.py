@@ -8,6 +8,7 @@ from .assembler import VideoAssembler
 from .discovery import NewsDiscovery
 from .publisher import YouTubePublisher
 from .captioner import CaptionGenerator
+from .thumbnail import ThumbnailGenerator
 
 __all__ = [
     "BrowserRecorder",
@@ -17,4 +18,5 @@ __all__ = [
     "NewsDiscovery",
     "YouTubePublisher",
     "CaptionGenerator",
+    "ThumbnailGenerator",
 ]

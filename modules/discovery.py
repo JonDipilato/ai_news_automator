@@ -84,7 +84,6 @@ class NewsDiscovery:
                     query=query,
                     search_depth="advanced",
                     max_results=count,
-                    include_domains=["github.com", "producthunt.com", "dev.to"],
                     exclude_domains=self._get_excluded_domains()
                 )
 

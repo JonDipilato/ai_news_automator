@@ -1,12 +1,12 @@
 """
 Caption generation module using Whisper.
-Generates accurate SRT captions from audio with word-level timing.
+Generates accurate SRT captions with 2-3 words per frame for TikTok/YouTube Shorts style.
 """
 import json
+import re
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
-import subprocess
 
 from config.settings import AUDIO_DIR, CAPTIONS_DIR, OPENAI_API_KEY
 
@@ -21,21 +21,21 @@ class CaptionSegment:
 
 
 class CaptionGenerator:
-    """Generates SRT captions from audio using Whisper."""
+    """Generates SRT captions from audio using Whisper with 2-3 word chunks."""
 
-    def __init__(self, use_local: bool = True):
+    def __init__(self, words_per_chunk: int = 3):
         """
         Initialize caption generator.
 
         Args:
-            use_local: Try local Whisper first, fallback to API
+            words_per_chunk: Max words per caption (default 3 for punchy style)
         """
-        self.use_local = use_local
+        self.words_per_chunk = words_per_chunk
         self._local_model = None
 
     def generate(self, project_id: str) -> Optional[Path]:
         """
-        Generate SRT captions for a project.
+        Generate SRT captions for a project with 2-3 words per caption.
 
         Args:
             project_id: Project identifier
@@ -49,17 +49,18 @@ class CaptionGenerator:
         if not audio_file.exists():
             return None
 
-        # Try local Whisper first
-        if self.use_local:
-            result = self._transcribe_local(audio_file, srt_file)
-            if result:
-                return result
+        # Try local Whisper first (has word-level timestamps)
+        result = self._transcribe_local(audio_file)
+        if result:
+            segments = self._chunk_words(result)
+            self._write_srt(segments, srt_file)
+            return srt_file
 
         # Fallback to API
         return self._transcribe_api(audio_file, srt_file)
 
-    def _transcribe_local(self, audio: Path, output: Path) -> Optional[Path]:
-        """Transcribe using local Whisper model."""
+    def _transcribe_local(self, audio: Path) -> Optional[dict]:
+        """Transcribe using local Whisper model with word timestamps."""
         try:
             import whisper
 
@@ -71,12 +72,7 @@ class CaptionGenerator:
                 word_timestamps=True,
                 verbose=False
             )
-
-            # Convert to SRT
-            segments = self._whisper_to_segments(result)
-            self._write_srt(segments, output)
-
-            return output
+            return result
 
         except ImportError:
             return None
@@ -84,8 +80,62 @@ class CaptionGenerator:
             print(f"Local transcription error: {e}")
             return None
 
+    def _chunk_words(self, whisper_result: dict) -> list[CaptionSegment]:
+        """
+        Split transcription into 2-3 word chunks for punchy captions.
+        """
+        segments = []
+        index = 1
+
+        for segment in whisper_result.get("segments", []):
+            words = segment.get("words", [])
+
+            if not words:
+                # Fallback: split segment text manually
+                text = segment.get("text", "").strip()
+                word_list = text.split()
+                seg_start = segment.get("start", 0)
+                seg_end = segment.get("end", seg_start + 1)
+                seg_duration = seg_end - seg_start
+
+                # Estimate timing per word
+                if word_list:
+                    time_per_word = seg_duration / len(word_list)
+
+                    for i in range(0, len(word_list), self.words_per_chunk):
+                        chunk_words = word_list[i:i + self.words_per_chunk]
+                        chunk_start = seg_start + (i * time_per_word)
+                        chunk_end = min(chunk_start + (len(chunk_words) * time_per_word), seg_end)
+
+                        segments.append(CaptionSegment(
+                            index=index,
+                            start_time=chunk_start,
+                            end_time=chunk_end,
+                            text=" ".join(chunk_words).upper()
+                        ))
+                        index += 1
+            else:
+                # Use word-level timestamps from Whisper
+                for i in range(0, len(words), self.words_per_chunk):
+                    chunk = words[i:i + self.words_per_chunk]
+                    if chunk:
+                        chunk_text = " ".join(w.get("word", "").strip() for w in chunk)
+                        # Clean up text
+                        chunk_text = re.sub(r'[^\w\s\'-]', '', chunk_text).upper()
+
+                        if chunk_text.strip():
+                            segments.append(CaptionSegment(
+                                index=index,
+                                start_time=chunk[0].get("start", 0),
+                                end_time=chunk[-1].get("end", chunk[0].get("start", 0) + 0.5),
+                                text=chunk_text
+                            ))
+                            index += 1
+
+        return segments
+
     def _transcribe_api(self, audio: Path, output: Path) -> Optional[Path]:
-        """Transcribe using OpenAI Whisper API."""
+        """Transcribe using OpenAI Whisper API with word-level timestamps."""
         if not OPENAI_API_KEY:
             return None
 
@@ -99,18 +149,28 @@ class CaptionGenerator:
                     model="whisper-1",
                     file=f,
                     response_format="verbose_json",
-                    timestamp_granularities=["segment"]
+                    timestamp_granularities=["word"]
                 )
 
-            # Convert API response to segments
+            # Chunk the words into 2-3 word segments
             segments = []
-            for i, seg in enumerate(response.segments, 1):
-                segments.append(CaptionSegment(
-                    index=i,
-                    start_time=seg["start"],
-                    end_time=seg["end"],
-                    text=seg["text"].strip()
-                ))
+            words = response.words if hasattr(response, 'words') else []
+            index = 1
+
+            for i in range(0, len(words), self.words_per_chunk):
+                chunk = words[i:i + self.words_per_chunk]
+                if chunk:
+                    chunk_text = " ".join(w.word.strip() for w in chunk)
+                    chunk_text = re.sub(r'[^\w\s\'-]', '', chunk_text).upper()
+
+                    if chunk_text.strip():
+                        segments.append(CaptionSegment(
+                            index=index,
+                            start_time=chunk[0].start,
+                            end_time=chunk[-1].end,
+                            text=chunk_text
+                        ))
+                        index += 1
 
             self._write_srt(segments, output)
             return output
@@ -118,25 +178,6 @@ class CaptionGenerator:
         except Exception as e:
             print(f"API transcription error: {e}")
             return None
-
-    def _whisper_to_segments(self, result: dict) -> list[CaptionSegment]:
-        """Convert Whisper result to caption segments."""
-        segments = []
-
-        for i, seg in enumerate(result.get("segments", []), 1):
-            # Clean up text
-            text = seg["text"].strip()
-            if not text:
-                continue
-
-            segments.append(CaptionSegment(
-                index=i,
-                start_time=seg["start"],
-                end_time=seg["end"],
-                text=text
-            ))
-
-        return segments
 
     def _write_srt(self, segments: list[CaptionSegment], output: Path):
         """Write segments to SRT file."""
@@ -162,33 +203,20 @@ class CaptionGenerator:
         return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
     def generate_vtt(self, project_id: str) -> Optional[Path]:
-        """
-        Generate WebVTT captions (alternative format).
-
-        Args:
-            project_id: Project identifier
-
-        Returns:
-            Path to VTT file or None
-        """
+        """Generate WebVTT captions (alternative format)."""
         srt_file = CAPTIONS_DIR / f"{project_id}.srt"
         vtt_file = CAPTIONS_DIR / f"{project_id}.vtt"
 
-        # Generate SRT first if needed
         if not srt_file.exists():
             result = self.generate(project_id)
             if not result:
                 return None
 
-        # Convert SRT to VTT
         try:
             srt_content = srt_file.read_text(encoding="utf-8")
-
-            # VTT header
             vtt_lines = ["WEBVTT", ""]
 
             for line in srt_content.split("\n"):
-                # Convert timestamp separator
                 if " --> " in line:
                     line = line.replace(",", ".")
                 vtt_lines.append(line)
@@ -201,18 +229,20 @@ class CaptionGenerator:
             return None
 
 
-def generate_captions(project_id: str, format: str = "srt") -> Optional[str]:
+def generate_captions(project_id: str, format: str = "srt",
+                      words_per_chunk: int = 3) -> Optional[str]:
     """
     Convenience function to generate captions.
 
     Args:
         project_id: Project identifier
         format: Output format ("srt" or "vtt")
+        words_per_chunk: Max words per caption frame (default 3)
 
     Returns:
         Path to caption file as string, or None
     """
-    generator = CaptionGenerator()
+    generator = CaptionGenerator(words_per_chunk=words_per_chunk)
 
     if format == "vtt":
         result = generator.generate_vtt(project_id)

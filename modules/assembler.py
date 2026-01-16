@@ -1,6 +1,7 @@
 """
 Video assembly module using FFmpeg.
 Combines recording, audio, and captions into final video.
+Features: Bold captions, transitions, professional styling.
 """
 import json
 import subprocess
@@ -8,6 +9,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
+from datetime import datetime
 
 from config.settings import (
     VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS,
@@ -150,8 +152,9 @@ class VideoAssembler:
 
     def _build_ffmpeg_command(self, recording: Path, audio: Path,
                                output: Path, captions: Optional[Path],
-                               target_duration: float) -> list[str]:
-        """Build FFmpeg command for assembly."""
+                               target_duration: float,
+                               with_transitions: bool = True) -> list[str]:
+        """Build FFmpeg command for assembly with styled captions."""
         cmd = [
             "ffmpeg", "-y",
             "-i", str(recording),
@@ -164,20 +167,40 @@ class VideoAssembler:
             f"fps={VIDEO_FPS}"
         ]
 
-        # Add captions if available
+        # Add fade in/out transitions
+        if with_transitions:
+            vf_filters.append("fade=t=in:st=0:d=0.5")
+            # Fade out at end (requires knowing duration, applied via separate filter)
+
+        # Add styled captions if available
+        # Bold, centered, with shadow/outline for readability
         if captions:
-            # Escape path for FFmpeg subtitles filter
             caption_path = str(captions).replace("\\", "/").replace(":", "\\:")
-            vf_filters.append(f"subtitles='{caption_path}'")
+            # Subtitle styling: bold, white, centered, with black outline
+            # Force style overrides for ASS/SRT
+            subtitle_filter = (
+                f"subtitles='{caption_path}':"
+                f"force_style='FontName=Arial Black,"
+                f"FontSize=28,"
+                f"PrimaryColour=&H00FFFFFF,"  # White
+                f"OutlineColour=&H00000000,"  # Black outline
+                f"BackColour=&H80000000,"     # Semi-transparent black background
+                f"Bold=1,"
+                f"Outline=3,"
+                f"Shadow=2,"
+                f"MarginV=60,"                # Bottom margin
+                f"Alignment=2'"               # Center-bottom
+            )
+            vf_filters.append(subtitle_filter)
 
         cmd.extend(["-vf", ",".join(vf_filters)])
 
-        # Audio settings - stretch/compress to match video duration
+        # Audio settings
         cmd.extend([
             "-c:v", VIDEO_CODEC,
             "-c:a", AUDIO_CODEC,
             "-ar", str(AUDIO_SAMPLE_RATE),
-            "-shortest",  # End when shortest stream ends
+            "-shortest",
             "-preset", "medium",
             "-crf", "23",
             str(output)
@@ -203,35 +226,123 @@ class VideoAssembler:
 
     def _create_review_metadata(self, project_id: str, video_path: Path,
                                  duration: float):
-        """Create metadata file for review stage."""
-        # Load script for title/description
+        """Create comprehensive metadata file for YouTube upload."""
         script_file = RECORDINGS_DIR / f"{project_id}_script.json"
+        timestamps_file = RECORDINGS_DIR / f"{project_id}_timestamps.json"
+
         title = f"Tutorial: {project_id}"
         description = ""
+        segments = []
+        url = ""
 
+        # Load script data
         if script_file.exists():
             with open(script_file) as f:
                 script_data = json.load(f)
                 title = script_data.get("title", title)
-                # Build description from hook and outro
                 hook = script_data.get("hook", "")
                 outro = script_data.get("outro", "")
-                description = f"{hook}\n\n{outro}"
+                segments = script_data.get("segments", [])
+
+        # Load timestamps for chapter markers
+        if timestamps_file.exists():
+            with open(timestamps_file) as f:
+                ts_data = json.load(f)
+                url = ts_data.get("url", "")
+
+        # Generate YouTube chapters from segments
+        chapters = self._generate_chapters(segments)
+
+        # Build full description
+        description_parts = [
+            hook,
+            "",
+            "TIMESTAMPS:",
+            chapters,
+            "",
+            f"Demo URL: {url}" if url else "",
+            "",
+            outro,
+            "",
+            "---",
+            "#AI #Tutorial #Technology #Automation"
+        ]
+        description = "\n".join(filter(None, description_parts))
+
+        # Generate smart tags
+        tags = self._generate_tags(title, hook)
 
         meta = {
             "project_id": project_id,
             "video_file": str(video_path),
+            "thumbnail_file": str(REVIEW_DIR / f"{project_id}_thumb.jpg"),
             "duration_seconds": duration,
+            "duration_formatted": self._format_duration(duration),
             "title": title,
             "description": description,
-            "tags": ["tutorial", "ai", "technology"],
+            "tags": tags,
+            "chapters": chapters,
+            "demo_url": url,
+            "created_at": datetime.now().isoformat(),
             "status": "pending_review",
-            "approved": False
+            "approved": False,
+            "youtube_category": "28",  # Science & Technology
+            "youtube_privacy": "private"
         }
 
         meta_file = REVIEW_DIR / f"{project_id}_meta.json"
         with open(meta_file, "w") as f:
             json.dump(meta, f, indent=2)
+
+    def _generate_chapters(self, segments: list) -> str:
+        """Generate YouTube chapter timestamps from segments."""
+        if not segments:
+            return "0:00 Intro"
+
+        chapters = ["0:00 Intro"]
+        for i, seg in enumerate(segments):
+            start = seg.get("start_time", 0)
+            if start > 0:
+                mins = int(start // 60)
+                secs = int(start % 60)
+                # Create chapter title from segment text (first few words)
+                text = seg.get("text", f"Part {i+1}")
+                chapter_title = " ".join(text.split()[:4])
+                if len(chapter_title) > 30:
+                    chapter_title = chapter_title[:30] + "..."
+                chapters.append(f"{mins}:{secs:02d} {chapter_title}")
+
+        return "\n".join(chapters)
+
+    def _generate_tags(self, title: str, hook: str) -> list:
+        """Generate relevant tags from content."""
+        base_tags = ["tutorial", "ai", "technology", "how to", "guide"]
+
+        # Extract keywords from title
+        skip_words = {"the", "a", "an", "is", "are", "how", "to", "and", "or", "for", "in", "here", "this"}
+        title_words = [w.lower() for w in title.split() if w.lower() not in skip_words and len(w) > 2]
+
+        # Add title-based tags
+        tags = base_tags + title_words[:5]
+
+        # Add common AI-related tags if relevant
+        ai_keywords = ["ai", "gpt", "claude", "llm", "chatgpt", "automation", "coding", "developer"]
+        combined_text = (title + " " + hook).lower()
+        for kw in ai_keywords:
+            if kw in combined_text and kw not in tags:
+                tags.append(kw)
+
+        return list(set(tags))[:15]  # YouTube max 15 tags
+
+    def _format_duration(self, seconds: float) -> str:
+        """Format duration as MM:SS or HH:MM:SS."""
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        if mins >= 60:
+            hours = mins // 60
+            mins = mins % 60
+            return f"{hours}:{mins:02d}:{secs:02d}"
+        return f"{mins}:{secs:02d}"
 
     def generate_captions(self, project_id: str) -> Optional[Path]:
         """
@@ -310,28 +421,44 @@ class VideoAssembler:
             return None
 
 
-def assemble_video(project_id: str, with_captions: bool = True) -> dict:
+def assemble_video(project_id: str, with_captions: bool = True,
+                   generate_thumbnail: bool = True) -> dict:
     """
-    Convenience function to assemble a video.
+    Convenience function to assemble a video with all features.
 
     Args:
         project_id: Project identifier
-        with_captions: Include captions
+        with_captions: Include captions (2-3 words per frame)
+        generate_thumbnail: Auto-generate YouTube thumbnail
 
     Returns:
         Assembly result as dict
     """
+    from .captioner import CaptionGenerator
+    from .thumbnail import ThumbnailGenerator
+
     assembler = VideoAssembler()
 
-    # Generate captions first if requested
+    # Generate captions with 2-3 word chunks
     if with_captions:
-        assembler.generate_captions(project_id)
+        captioner = CaptionGenerator(words_per_chunk=3)
+        captioner.generate(project_id)
 
+    # Assemble video
     result = assembler.assemble(project_id, include_captions=with_captions)
+
+    # Generate thumbnail if video succeeded
+    thumbnail_path = ""
+    if result.success and generate_thumbnail:
+        thumb_gen = ThumbnailGenerator()
+        thumb_result = thumb_gen.generate(project_id)
+        if thumb_result.success:
+            thumbnail_path = thumb_result.thumbnail_path
 
     return {
         "project_id": result.project_id,
         "output_file": result.output_file,
+        "thumbnail_file": thumbnail_path,
         "duration": result.duration,
         "has_captions": result.has_captions,
         "audio_video_sync": result.audio_video_sync,
