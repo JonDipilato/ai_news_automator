@@ -111,16 +111,80 @@ class VoiceGenerator:
         return " ".join(parts)
 
     def _generate_audio(self, text: str, output_path: Path):
-        """Generate audio file using OpenAI TTS."""
-        response = self.client.audio.speech.create(
-            model=TTS_MODEL,
-            voice=TTS_VOICE,
-            input=text,
-            response_format="mp3"
-        )
+        """Generate audio file using OpenAI TTS, handling long text."""
+        MAX_CHARS = 4000  # Leave buffer under 4096 limit
 
-        # Stream to file
-        response.stream_to_file(str(output_path))
+        if len(text) <= MAX_CHARS:
+            # Short text - single API call
+            response = self.client.audio.speech.create(
+                model=TTS_MODEL,
+                voice=TTS_VOICE,
+                input=text,
+                response_format="mp3"
+            )
+            response.stream_to_file(str(output_path))
+        else:
+            # Long text - split into chunks and concatenate
+            chunks = self._split_text(text, MAX_CHARS)
+            temp_files = []
+
+            for i, chunk in enumerate(chunks):
+                temp_file = output_path.parent / f"_temp_chunk_{i}.mp3"
+                response = self.client.audio.speech.create(
+                    model=TTS_MODEL,
+                    voice=TTS_VOICE,
+                    input=chunk,
+                    response_format="mp3"
+                )
+                response.stream_to_file(str(temp_file))
+                temp_files.append(temp_file)
+
+            # Concatenate using ffmpeg
+            self._concatenate_audio(temp_files, output_path)
+
+            # Cleanup temp files
+            for f in temp_files:
+                f.unlink(missing_ok=True)
+
+    def _split_text(self, text: str, max_chars: int) -> list[str]:
+        """Split text at sentence boundaries."""
+        import re
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        chunks = []
+        current_chunk = ""
+
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) + 1 <= max_chars:
+                current_chunk += (" " if current_chunk else "") + sentence
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence
+
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
+    def _concatenate_audio(self, files: list[Path], output: Path):
+        """Concatenate multiple audio files using ffmpeg."""
+        import subprocess
+        import tempfile
+
+        # Create file list for ffmpeg
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            for audio_file in files:
+                f.write(f"file '{audio_file}'\n")
+            list_file = f.name
+
+        try:
+            cmd = [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                "-i", list_file, "-c", "copy", str(output)
+            ]
+            subprocess.run(cmd, capture_output=True, check=True)
+        finally:
+            Path(list_file).unlink(missing_ok=True)
 
     def generate_segment_audio(self, script_file: str) -> list[AudioSegment]:
         """
