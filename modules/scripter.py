@@ -2,9 +2,10 @@
 Script generation module using Claude.
 Generates timed narration scripts that sync with recorded video.
 
-Supports two modes:
+Supports three modes:
 - tutorial: Full educational content with learning objectives, concept explanations, and summaries
 - howto: Quick practical content with concise step-by-step instructions
+- news: Fast WorldofAI-style breaking news narration tied to demos
 """
 import json
 from pathlib import Path
@@ -18,7 +19,7 @@ from config.settings import (
 )
 
 # Script generation modes
-ScriptMode = Literal["tutorial", "howto"]
+ScriptMode = Literal["tutorial", "howto", "news"]
 
 
 @dataclass
@@ -47,7 +48,9 @@ class ScriptGenerator:
 
     def __init__(self, mode: ScriptMode = "tutorial"):
         self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        self.mode = mode
+        allowed_modes = {"tutorial", "howto", "news"}
+        normalized_mode = (mode or "tutorial").lower()
+        self.mode = normalized_mode if normalized_mode in allowed_modes else "tutorial"
         self.intro_template = self._load_template("script_intro.txt")
         self.body_template = self._load_template("script_body.txt")
 
@@ -57,6 +60,9 @@ class ScriptGenerator:
         self.tutorial_summary = self._load_template("tutorial_summary.txt")
         self.howto_intro = self._load_template("howto_intro.txt")
         self.howto_segment = self._load_template("howto_segment.txt")
+        self.news_intro = self._load_template("news_intro.txt")
+        self.news_segment = self._load_template("news_segment.txt")
+        self.news_outro = self._load_template("news_outro.txt")
 
     def _load_template(self, filename: str) -> str:
         """Load a prompt template."""
@@ -78,14 +84,16 @@ class ScriptGenerator:
         Args:
             timestamps_file: Path to timestamps JSON from recording
             topic: Optional topic override
-            mode: Script generation mode ("tutorial" or "howto")
+        mode: Script generation mode ("tutorial", "howto", or "news")
             educational_context: Optional dict with learning objectives, prerequisites, etc.
 
         Returns:
             GeneratedScript with timed segments
         """
         # Use provided mode or default
-        script_mode = mode or self.mode
+        script_mode = (mode or self.mode or "tutorial").lower()
+        if script_mode not in {"tutorial", "howto", "news"}:
+            script_mode = "tutorial"
 
         # Load timestamps
         with open(timestamps_file) as f:
@@ -108,12 +116,21 @@ class ScriptGenerator:
                 topic=topic,
                 educational_context=educational_context
             )
-        else:  # howto
+        elif script_mode == "howto":
             prompt = self._build_howto_prompt(
                 url=url,
                 duration=duration,
                 actions=actions_context,
-                topic=topic
+                topic=topic,
+                educational_context=educational_context
+            )
+        else:  # news
+            prompt = self._build_news_prompt(
+                url=url,
+                duration=duration,
+                actions=actions_context,
+                topic=topic,
+                educational_context=educational_context
             )
 
         response = self.client.messages.create(
@@ -138,14 +155,249 @@ class ScriptGenerator:
 
     def _format_actions(self, actions: list[dict]) -> str:
         """Format actions list for prompt context."""
+        if not actions:
+            return "No actions recorded."
+
         lines = []
         for action in actions:
             time_str = f"[{action['time_seconds']:.1f}s]"
             desc = action['description']
             if action.get('element_text'):
                 desc += f" ({action['element_text'][:50]})"
-            lines.append(f"{time_str} {action['action_type']}: {desc}")
+
+            scene_bits = []
+            scene_index = action.get("scene_index")
+            if scene_index is not None:
+                scene_bits.append(f"scene {int(scene_index) + 1}")
+            if action.get("scene_type"):
+                scene_bits.append(action["scene_type"])
+
+            scene_label = f" ({' | '.join(scene_bits)})" if scene_bits else ""
+            lines.append(f"{time_str}{scene_label} {action['action_type']}: {desc}")
         return "\n".join(lines)
+
+    def _format_educational_context(self, educational_context: Optional[dict]) -> str:
+        """Format educational context for the prompt."""
+        if not educational_context:
+            return "Not provided."
+
+        lines = []
+
+        video = educational_context.get("video") or {}
+        if video:
+            if video.get("learning_objectives"):
+                lines.append(f"Learning objectives: {', '.join(video['learning_objectives'])}")
+            if video.get("target_audience"):
+                lines.append(f"Target audience: {video['target_audience']}")
+            if video.get("difficulty_level"):
+                lines.append(f"Difficulty level: {video['difficulty_level']}")
+            if video.get("prerequisites"):
+                lines.append(f"Prerequisites: {', '.join(video['prerequisites'])}")
+            if video.get("related_topics"):
+                lines.append(f"Related topics: {', '.join(video['related_topics'])}")
+            if video.get("outro_style"):
+                lines.append(f"Outro style: {video['outro_style']}")
+            if "include_subscribe_cta" in video:
+                include_cta = "yes" if video["include_subscribe_cta"] else "no"
+                lines.append(f"Include subscribe CTA: {include_cta}")
+            if video.get("next_video_tease"):
+                lines.append(f"Next video tease: {video['next_video_tease']}")
+
+        scenes = educational_context.get("scenes") or []
+        if scenes:
+            lines.append("Scene notes:")
+            for scene in scenes:
+                scene_parts = []
+                scene_index = scene.get("index")
+                if scene_index is not None:
+                    scene_parts.append(f"Scene {int(scene_index) + 1}")
+                if scene.get("type"):
+                    scene_parts.append(f"({scene['type']})")
+
+                label = " ".join(scene_parts).strip()
+                details = []
+                if scene.get("description"):
+                    details.append(f"description: {scene['description']}")
+                if scene.get("learning_objective"):
+                    details.append(f"objective: {scene['learning_objective']}")
+                if scene.get("concept_explanation"):
+                    details.append(f"concept: {scene['concept_explanation']}")
+                if scene.get("prerequisites"):
+                    details.append(f"prereq: {', '.join(scene['prerequisites'])}")
+                if scene.get("common_mistakes"):
+                    details.append(f"common mistakes: {', '.join(scene['common_mistakes'])}")
+                if scene.get("key_takeaway"):
+                    details.append(f"takeaway: {scene['key_takeaway']}")
+                if scene.get("tips"):
+                    details.append(f"tips: {', '.join(scene['tips'])}")
+                if scene.get("narration_hint"):
+                    details.append(f"narration hint: {scene['narration_hint']}")
+
+                if label and details:
+                    lines.append(f"- {label}: {'; '.join(details)}")
+                elif details:
+                    lines.append(f"- {'; '.join(details)}")
+
+        if not lines:
+            return "Not provided."
+
+        return "\n".join(lines)
+
+    def _build_tutorial_prompt(self, url: str, duration: float, actions: str,
+                               topic: Optional[str], educational_context: Optional[dict]) -> str:
+        """Build a full tutorial prompt with educational guidance."""
+        topic_context = f"Topic: {topic}\n" if topic else ""
+        context_block = self._format_educational_context(educational_context)
+
+        guidance_parts = []
+        if self.tutorial_intro.strip():
+            guidance_parts.append(f"INTRO GUIDANCE:\n{self.tutorial_intro.strip()}")
+        if self.tutorial_segment.strip():
+            guidance_parts.append(f"SEGMENT GUIDANCE:\n{self.tutorial_segment.strip()}")
+        if self.tutorial_summary.strip():
+            guidance_parts.append(f"SUMMARY GUIDANCE:\n{self.tutorial_summary.strip()}")
+        guidance_text = "\n\n".join(guidance_parts)
+
+        hook_end_time = 8.0
+
+        return f"""You are writing an educational tutorial narration.
+
+{topic_context}URL being demonstrated: {url}
+Total video duration: {duration:.1f} seconds
+
+EDUCATIONAL CONTEXT:
+{context_block}
+
+RECORDED ACTIONS (with timestamps):
+{actions}
+
+{guidance_text}
+
+STYLE RULES:
+- Explain why before how.
+- Tie narration to what happens on screen.
+- Use the educational context when relevant.
+- Mention prerequisites and common mistakes only if provided.
+- Keep the tone clear, confident, and helpful.
+
+TIMING RULES:
+- Hook: 0 to {hook_end_time} seconds.
+- First segment starts at {hook_end_time} seconds.
+- Each segment: 5 to 15 seconds of speech.
+- Outro: final 10 to 15 seconds of the video.
+- Total speech: about 80 percent of the video duration.
+
+OUTPUT REQUIREMENTS:
+- Return a JSON object with keys: title, hook, segments, outro.
+- Each segment has keys: start_time, end_time, text, emphasis.
+- Emphasis values: excited, normal, thoughtful.
+- Use timestamps that fit within the total duration.
+"""
+
+    def _build_howto_prompt(self, url: str, duration: float, actions: str,
+                            topic: Optional[str], educational_context: Optional[dict]) -> str:
+        """Build a quick how-to prompt with concise structure."""
+        topic_context = f"Topic: {topic}\n" if topic else ""
+        context_block = self._format_educational_context(educational_context)
+
+        guidance_parts = []
+        if self.howto_intro.strip():
+            guidance_parts.append(f"INTRO GUIDANCE:\n{self.howto_intro.strip()}")
+        if self.howto_segment.strip():
+            guidance_parts.append(f"SEGMENT GUIDANCE:\n{self.howto_segment.strip()}")
+        guidance_text = "\n\n".join(guidance_parts)
+
+        hook_end_time = 6.0
+
+        return f"""You are writing a fast, practical how-to narration.
+
+{topic_context}URL being demonstrated: {url}
+Total video duration: {duration:.1f} seconds
+
+EDUCATIONAL CONTEXT:
+{context_block}
+
+RECORDED ACTIONS (with timestamps):
+{actions}
+
+{guidance_text}
+
+STYLE RULES:
+- Keep it concise and step-driven.
+- Describe the action as it happens.
+- Add tips only when they prevent errors.
+- Use the educational context when it helps prevent errors.
+- Keep the hook and outro short.
+
+TIMING RULES:
+- Hook: 0 to {hook_end_time} seconds.
+- First segment starts at {hook_end_time} seconds.
+- Each segment: 5 to 12 seconds of speech.
+- Outro: final 8 to 12 seconds of the video.
+- Total speech: about 75 percent of the video duration.
+
+        OUTPUT REQUIREMENTS:
+        - Return a JSON object with keys: title, hook, segments, outro.
+        - Each segment has keys: start_time, end_time, text, emphasis.
+        - Emphasis values: excited, normal, thoughtful.
+        - Use timestamps that fit within the total duration.
+        """
+
+    def _build_news_prompt(self, url: str, duration: float, actions: str,
+                           topic: Optional[str], educational_context: Optional[dict]) -> str:
+        """Build a WorldofAI-style news prompt with hype pacing."""
+        topic_context = f"Topic: {topic}\n" if topic else ""
+        context_block = self._format_educational_context(educational_context)
+
+        guidance_parts = []
+        if self.news_intro.strip():
+            guidance_parts.append(f"HOOK CADENCE:\n{self.news_intro.strip()}")
+        if self.news_segment.strip():
+            guidance_parts.append(f"SEGMENT CADENCE:\n{self.news_segment.strip()}")
+        if self.news_outro.strip():
+            guidance_parts.append(f"OUTRO CADENCE:\n{self.news_outro.strip()}")
+        guidance_text = "\n\n".join(guidance_parts)
+
+        hook_end_time = 5.0
+
+        return f"""You are writing a WorldofAI-style AI news narration that reacts to a live screen recording.
+
+{topic_context}URL being demonstrated: {url}
+Total video duration: {duration:.1f} seconds
+
+EDUCATIONAL CONTEXT (only use details that heighten urgency):
+{context_block}
+
+RECORDED ACTIONS (describe these exact beats like a play-by-play):
+{actions}
+
+{guidance_text}
+
+STYLE RULES:
+- Sound like you're mid-conversation and just saw this drop—no intros.
+- Sentences stay under 10 words with energetic fragments and commands.
+- Call out FREE/UPGRADED/INSANE speed moments the instant they appear.
+- React to cursor moves, clicks, and results in real time ("watch", "look", "wait for it").
+- Allowed slang: wild, ridiculous, insane, boom. Banned phrases: "in this video", "today we're".
+
+TITLE RULES:
+- Format inspiration: TOOL UPGRADE! BENEFIT + FREE HOOK (all caps for big words).
+- Mention the benefit within the first six words and promise a payoff.
+- Include "FREE", "UPGRADED", or "NEW" when the recording proves it.
+
+TIMING RULES:
+- Hook: 0 to {hook_end_time} seconds, feels like you hit record mid-sentence.
+- Segments: 3-8 seconds each, always end by pointing to the next visual beat.
+- Leave micro-pauses (1 second) only when the viewer needs to read on-screen text.
+- Outro: final 7-10 seconds with recap, CTA, and tease of the next drop.
+
+OUTPUT REQUIREMENTS:
+- Return JSON with keys: title, hook, segments, outro.
+- Each segment must include start_time, end_time, text, emphasis.
+- Emphasis values: excited, normal, thoughtful (default to excited unless the visuals slow down).
+- Keep timestamps within the total duration and never overlap segments.
+
+Sound like a creator who just uncovered a wild AI update and needs the viewer to watch it NOW."""
 
     def _build_script_prompt(self, url: str, duration: float,
                               actions: str, topic: Optional[str]) -> str:
@@ -262,6 +514,24 @@ Generate the JSON script. Sound like a real YouTuber, not a tutorial bot:"""
                                 duration: float) -> GeneratedScript:
         """Parse Claude's response into a GeneratedScript."""
         # Extract JSON from response
+
+        def _coerce_text(value) -> str:
+            """Convert Claude responses to plain text."""
+            if isinstance(value, str):
+                return value
+            if isinstance(value, dict):
+                for key in ("text", "content", "value"):
+                    if isinstance(value.get(key), str):
+                        return value[key]
+                # Fall back to stringified dict to retain info
+                return " ".join(
+                    _coerce_text(item) for item in value.values()
+                    if isinstance(item, (str, dict, list))
+                ).strip() or str(value)
+            if isinstance(value, list):
+                return " ".join(_coerce_text(item) for item in value).strip()
+            return str(value)
+
         try:
             # Find JSON block in response
             json_start = response.find("{")
@@ -273,26 +543,36 @@ Generate the JSON script. Sound like a real YouTuber, not a tutorial bot:"""
             return self._create_fallback_script(project_id, duration)
 
         # Convert to dataclass
-        segments = [
-            ScriptSegment(
-                start_time=seg["start_time"],
-                end_time=seg["end_time"],
-                text=seg["text"],
-                emphasis=seg.get("emphasis", "normal")
+        segments = []
+        for seg in data.get("segments", []):
+            if not isinstance(seg, dict):
+                continue
+            text_value = _coerce_text(seg.get("text", ""))
+            emphasis_value = seg.get("emphasis", "normal")
+            if isinstance(emphasis_value, dict):
+                emphasis_value = emphasis_value.get("value", "normal")
+            emphasis_text = str(emphasis_value or "normal").lower()
+            segments.append(
+                ScriptSegment(
+                    start_time=seg.get("start_time", 0.0),
+                    end_time=seg.get("end_time", 0.0),
+                    text=text_value,
+                    emphasis=emphasis_text or "normal"
+                )
             )
-            for seg in data.get("segments", [])
-        ]
 
         # Calculate word count
-        all_text = data.get("hook", "") + " ".join(s.text for s in segments) + data.get("outro", "")
+        hook_text = _coerce_text(data.get("hook", ""))
+        outro_text = _coerce_text(data.get("outro", ""))
+        all_text = f"{hook_text} {' '.join(s.text for s in segments)} {outro_text}".strip()
         word_count = len(all_text.split())
 
         return GeneratedScript(
             project_id=project_id,
-            title=data.get("title", f"Tutorial: {project_id}"),
-            hook=data.get("hook", ""),
+            title=_coerce_text(data.get("title", f"Tutorial: {project_id}")),
+            hook=hook_text,
             segments=segments,
-            outro=data.get("outro", ""),
+            outro=outro_text,
             total_duration=duration,
             word_count=word_count
         )
@@ -319,17 +599,30 @@ Generate the JSON script. Sound like a real YouTuber, not a tutorial bot:"""
         )
 
 
-def generate_script(timestamps_file: str, topic: Optional[str] = None) -> dict:
+def generate_script(
+    timestamps_file: str,
+    topic: Optional[str] = None,
+    mode: Optional[ScriptMode] = None,
+    educational_context: Optional[dict] = None
+) -> dict:
     """
     Convenience function to generate a script.
 
     Args:
         timestamps_file: Path to timestamps JSON
         topic: Optional topic description
+        mode: Script generation mode ("tutorial", "howto", or "news")
+        educational_context: Optional dict with learning objectives, prerequisites, etc.
 
     Returns:
         Script data as dict
     """
-    generator = ScriptGenerator()
-    script = generator.generate_from_timestamps(timestamps_file, topic)
+    normalized_mode = mode.lower() if isinstance(mode, str) else mode
+    generator = ScriptGenerator(mode=normalized_mode or "tutorial")
+    script = generator.generate_from_timestamps(
+        timestamps_file,
+        topic,
+        mode=normalized_mode,
+        educational_context=educational_context
+    )
     return asdict(script)

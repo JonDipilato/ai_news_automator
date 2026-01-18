@@ -1,0 +1,5 @@
+Intro structure:
+- State the learning objective in one clear sentence.
+- Say who this is for and the skill level.
+- Mention prerequisites only if provided.
+- Preview the steps briefly, then begin the first action.

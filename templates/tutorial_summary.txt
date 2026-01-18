@@ -1,0 +1,5 @@
+Summary structure:
+- Recap the objective and the main steps.
+- Highlight the single most important takeaway.
+- Suggest one next step or related topic if provided.
+- Include a call to action only when requested.

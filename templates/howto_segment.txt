@@ -1,0 +1,4 @@
+Segment structure:
+- Name the step and do the action.
+- Add a brief tip only when it prevents errors.
+- Keep pacing fast and direct.

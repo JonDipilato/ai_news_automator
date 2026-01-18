@@ -1,0 +1,5 @@
+Segment cadence:
+- One action per block (3-8 seconds) reacting to the screen.
+- Call out the result, why it matters, then what happens next.
+- Use hype verbs ("watch", "boom", "wait for it") to keep momentum.
+- Only add tips if they help the viewer copy the exact click or command.

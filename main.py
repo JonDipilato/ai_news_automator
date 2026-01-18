@@ -8,6 +8,9 @@ Demo-First workflow: Record browser demo -> Generate narration -> Assemble video
 import asyncio
 import json
 import sys
+import re
+from typing import Optional
+from urllib.parse import urlparse
 from pathlib import Path
 from datetime import datetime
 
@@ -24,13 +27,142 @@ from config.settings import (
     validate_api_keys, get_project_path,
     RECORDINGS_DIR, REVIEW_DIR, PUBLISHED_DIR
 )
+from modules.thumbnail import ThumbnailGenerator, generate_worldofai_thumbnail
 
 console = Console()
+WORLD_OF_AI_THEMES = sorted(ThumbnailGenerator.WORLDOFAI_THEMES.keys())
 
 
 def generate_project_id() -> str:
     """Generate unique project ID based on timestamp."""
     return datetime.now().strftime("demo_%Y%m%d_%H%M%S")
+
+
+def build_educational_context(manifest: dict) -> dict:
+    """Build educational context for script generation."""
+    if not manifest:
+        return {}
+
+    video = {
+        "learning_objectives": manifest.get("video_learning_objectives", []),
+        "target_audience": manifest.get("target_audience", ""),
+        "difficulty_level": manifest.get("difficulty_level", ""),
+        "prerequisites": manifest.get("prerequisites", []),
+        "related_topics": manifest.get("related_topics", []),
+        "outro_style": manifest.get("outro_style", ""),
+        "include_subscribe_cta": manifest.get("include_subscribe_cta", True),
+        "next_video_tease": manifest.get("next_video_tease", ""),
+    }
+
+    scenes = []
+    for idx, scene in enumerate(manifest.get("scenes", [])):
+        scenes.append({
+            "index": idx,
+            "type": scene.get("type", ""),
+            "description": scene.get("description", ""),
+            "learning_objective": scene.get("learning_objective", ""),
+            "concept_explanation": scene.get("concept_explanation", ""),
+            "prerequisites": scene.get("prerequisites", []),
+            "common_mistakes": scene.get("common_mistakes", []),
+            "key_takeaway": scene.get("key_takeaway", ""),
+            "tips": scene.get("tips", []),
+            "narration_hint": scene.get("narration_hint", ""),
+        })
+
+    return {"video": video, "scenes": scenes}
+
+
+def slugify(text: str) -> str:
+    """Create a filesystem-safe slug from text."""
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
+    return cleaned[:60] if cleaned else "video"
+
+
+def extract_install_command(raw_text: str) -> Optional[str]:
+    """Extract a pip install command from raw text."""
+    if not raw_text:
+        return None
+
+    matches = re.findall(r"(?:python -m pip|pip3|pip)\s+install[^\n\r`]*", raw_text)
+    if not matches:
+        return None
+
+    cmd = matches[0].strip().strip("`")
+    if cmd.startswith("pip "):
+        return f"python -m {cmd}"
+    if cmd.startswith("pip3 "):
+        return f"python -m {cmd.replace('pip3', 'pip', 1)}"
+    return cmd
+
+
+def extract_package_name(install_cmd: str) -> Optional[str]:
+    """Extract package name from a pip install command."""
+    if not install_cmd:
+        return None
+
+    parts = install_cmd.split("install", 1)
+    if len(parts) < 2:
+        return None
+
+    tokens = parts[1].strip().split()
+    for token in tokens:
+        if token.startswith("-"):
+            continue
+        token = token.strip("'\"")
+        token = token.split("[", 1)[0]
+        return token
+
+    return None
+
+
+def is_blocked_url(url: str, blocked_domains: set) -> bool:
+    """Check if a URL is on the blocked domains list."""
+    if not url:
+        return True
+
+    host = urlparse(url).netloc.lower()
+    host = host.split(":")[0]
+
+    for domain in blocked_domains:
+        if host == domain or host.endswith(f".{domain}"):
+            return True
+
+    return False
+
+
+def pick_best_url(results: list[dict], blocked_domains: set, preferred_terms: list[str]) -> Optional[str]:
+    """Pick the most relevant URL from Tavily results."""
+    if not results:
+        return None
+
+    def score_result(result: dict) -> int:
+        url = (result.get("url") or "").lower()
+        text = f"{result.get('title', '')} {result.get('content', '')}".lower()
+        score = 0
+        for term in preferred_terms:
+            if term in url:
+                score += 3
+            if term in text:
+                score += 1
+        return score
+
+    candidates = [r for r in results if r.get("url") and not is_blocked_url(r["url"], blocked_domains)]
+    if not candidates:
+        candidates = [r for r in results if r.get("url")]
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=score_result, reverse=True)
+    return candidates[0].get("url")
+
+
+def compact_summary(raw_text: str, limit: int = 800) -> str:
+    """Condense raw text into a short summary."""
+    if not raw_text:
+        return ""
+    cleaned = " ".join(line.strip() for line in raw_text.splitlines() if len(line.split()) > 6)
+    return " ".join(cleaned.split())[:limit]
 
 
 @click.group()
@@ -88,7 +220,14 @@ def record(url: str, project_id: str, duration: int, demo_steps: str):
 @cli.command()
 @click.option("--timestamps", required=True, help="Path to timestamps JSON from recording")
 @click.option("--topic", default=None, help="Optional topic description for better narration")
-def script(timestamps: str, topic: str):
+@click.option(
+    "--mode",
+    default="tutorial",
+    type=click.Choice(["tutorial", "howto", "news"], case_sensitive=False),
+    show_default=True,
+    help="Script mode for narration"
+)
+def script(timestamps: str, topic: str, mode: str):
     """Generate narration script from recording timestamps."""
     from modules.scripter import generate_script
 
@@ -107,7 +246,7 @@ def script(timestamps: str, topic: str):
     ) as progress:
         task = progress.add_task("Generating narration with Claude...", total=None)
 
-        result = generate_script(timestamps, topic)
+        result = generate_script(timestamps, topic, mode=mode)
 
         progress.update(task, completed=True)
 
@@ -128,6 +267,59 @@ def script(timestamps: str, topic: str):
 
     script_path = RECORDINGS_DIR / f"{result['project_id']}_script.json"
     console.print(f"\n[bold green]Next step:[/bold green] python main.py voice --script {script_path}")
+
+
+@cli.command("thumbnail-worldofai")
+@click.option("--project", required=True, help="Project ID used to name the output thumbnail")
+@click.option("--title-line1", required=True, help="First line of the bold title text")
+@click.option("--title-line2", default="", help="Optional second line of title text")
+@click.option("--subtitle", default="", help="Subtitle text below the main title")
+@click.option("--action-badge", default="", help="Top-left badge text (e.g., FULLY FREE, NEW)")
+@click.option("--content-badge", default="", help="Bottom-left badge text (e.g., TUTORIAL, NEWS)")
+@click.option("--company", default="", help="Company keyword to overlay its logo (anthropic, google, openai, etc.)")
+@click.option("--screenshot", "screenshot_path", default=None, help="Optional screenshot image for the right side")
+@click.option(
+    "--theme",
+    default="worldofai_purple",
+    type=click.Choice(WORLD_OF_AI_THEMES, case_sensitive=False),
+    show_default=True,
+    help="WorldofAI gradient theme"
+)
+def thumbnail_worldofai(project: str, title_line1: str, title_line2: str, subtitle: str,
+                        action_badge: str, content_badge: str, company: str,
+                        screenshot_path: str, theme: str):
+    """Generate a WorldofAI-style thumbnail with split layout and badges."""
+    screenshot = Path(screenshot_path).expanduser() if screenshot_path else None
+    if screenshot and not screenshot.exists():
+        console.print(f"[bold red]Error:[/bold red] Screenshot not found: {screenshot}")
+        return
+
+    details = (
+        f"Project: {project}\n"
+        f"Theme: {theme}\n"
+        f"Company: {company or 'n/a'}\n"
+        f"Action badge: {action_badge or 'n/a'}\n"
+        f"Content badge: {content_badge or 'n/a'}\n"
+        f"Screenshot: {screenshot if screenshot else 'none'}"
+    )
+    console.print(Panel(details, title="WorldofAI Thumbnail", border_style="magenta"))
+
+    result = generate_worldofai_thumbnail(
+        project_id=project,
+        title_line1=title_line1,
+        title_line2=title_line2,
+        subtitle=subtitle,
+        action_badge=action_badge,
+        content_badge=content_badge,
+        company=company,
+        screenshot_path=screenshot,
+        theme=theme.lower()
+    )
+
+    if result["success"]:
+        console.print(f"[bold green]Thumbnail ready:[/bold green] {result['thumbnail_path']}")
+    else:
+        console.print(f"[bold red]Thumbnail failed:[/bold red] {result['message']}")
 
 
 @cli.command()
@@ -462,6 +654,304 @@ def discover(category: str, count: int):
         console.print(f"\n[bold green]Create video:[/bold green] python main.py create --url \"{first['url']}\"")
 
 
+@cli.command("howto-auto")
+@click.option("--category", default="tutorials", help="Discovery category")
+@click.option("--index", default=1, type=int, help="Topic index (1-based)")
+@click.option("--count", default=10, type=int, help="Number of topics to fetch")
+@click.option("--docs-url", default=None, help="Override docs URL")
+@click.option("--repo-url", default=None, help="Override repository URL")
+@click.option("--install-cmd", default=None, help="Override install command")
+@click.option(
+    "--mode",
+    default="howto",
+    type=click.Choice(["tutorial", "howto", "news"], case_sensitive=False),
+    show_default=True,
+    help="Script mode"
+)
+@click.option(
+    "--recorder",
+    default=None,
+    type=click.Choice(["auto", "screen_capture", "rendered"], case_sensitive=False),
+    show_default=False,
+    help="Override recording backend"
+)
+def howto_auto(category: str, index: int, count: int, docs_url: str,
+               repo_url: str, install_cmd: str, mode: str, recorder: str):
+    """Fully automated how-to video: discover -> manifest -> record -> script -> voice -> assemble."""
+    from modules.discovery import discover_topics
+    from modules.scene_recorder import record_from_manifest
+    from modules.scripter import generate_script
+    from modules.voice import generate_voice
+    from modules.scene_assembler import assemble_scenes
+    from config.settings import TAVILY_API_KEY
+
+    if not TAVILY_API_KEY:
+        console.print("[bold red]Error:[/bold red] TAVILY_API_KEY not configured in .env")
+        return
+
+    missing = validate_api_keys()
+    if missing:
+        console.print(f"[bold red]Missing API keys:[/bold red] {', '.join(missing)}")
+        console.print("Configure these in your .env file")
+        return
+
+    topics = discover_topics(category, count)
+    if not topics:
+        console.print("[yellow]No topics found. Check your Tavily API key.[/yellow]")
+        return
+
+    if index < 1 or index > len(topics):
+        console.print(f"[bold red]Error:[/bold red] index must be 1-{len(topics)}")
+        return
+
+    topic = topics[index - 1]
+    topic_title = topic.get("title", "How-to")
+    source_url = topic.get("url", "")
+
+    try:
+        from tavily import TavilyClient
+        client = TavilyClient(api_key=TAVILY_API_KEY)
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] Tavily client unavailable: {exc}")
+        return
+
+    blocked_domains = {
+        "medium.com",
+        "towardsdatascience.com",
+        "substack.com",
+        "linkedin.com",
+        "x.com",
+        "twitter.com",
+        "t.co",
+        "youtube.com",
+        "youtu.be",
+    }
+
+    docs_url_final = docs_url
+    repo_url_final = repo_url
+
+    if not docs_url_final:
+        docs_result = client.search(
+            query=f"{topic_title} documentation",
+            search_depth="advanced",
+            max_results=8,
+            exclude_domains=list(blocked_domains)
+        )
+        docs_url_final = pick_best_url(
+            docs_result.get("results", []),
+            blocked_domains,
+            ["docs", "documentation", "quickstart", "getting-started", "install", "guide", "readme", "readthedocs"]
+        )
+
+    if not repo_url_final:
+        repo_result = client.search(
+            query=f"{topic_title} github",
+            search_depth="advanced",
+            max_results=8,
+            include_domains=["github.com"]
+        )
+        repo_url_final = pick_best_url(
+            repo_result.get("results", []),
+            blocked_domains,
+            ["github.com", "readme", "examples", "tutorial"]
+        )
+
+    def extract_raw(url: str) -> str:
+        if not url:
+            return ""
+        extract = client.extract(urls=[url], extract_depth="advanced", format="markdown")
+        if extract.get("results"):
+            return extract["results"][0].get("raw_content", "")
+        return ""
+
+    summary = topic.get("summary", "")
+    raw_docs = extract_raw(docs_url_final) if docs_url_final else ""
+    raw_repo = extract_raw(repo_url_final) if repo_url_final else ""
+    raw_source = ""
+    if source_url and not is_blocked_url(source_url, blocked_domains):
+        raw_source = extract_raw(source_url)
+
+    if not install_cmd:
+        install_cmd = (
+            extract_install_command(raw_docs)
+            or extract_install_command(raw_repo)
+            or extract_install_command(raw_source)
+        )
+
+    if not summary:
+        summary = compact_summary(raw_docs or raw_source or raw_repo)
+
+    if not install_cmd:
+        console.print("[bold red]Error:[/bold red] Install command not found.")
+        console.print("Pass --install-cmd with the exact command you want to run.")
+        return
+
+    package_name = extract_package_name(install_cmd)
+    if not package_name:
+        console.print("[bold red]Error:[/bold red] Unable to parse package name from install command.")
+        return
+
+    if not docs_url_final:
+        console.print("[bold red]Error:[/bold red] Docs URL not found. Pass --docs-url.")
+        return
+
+    if not repo_url_final:
+        console.print("[bold red]Error:[/bold red] Repo URL not found. Pass --repo-url.")
+        return
+
+    project_id = f"howto_{slugify(topic_title)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    manifest = {
+        "project_id": project_id,
+        "title": topic_title,
+        "topic": topic_title,
+        "target_duration": 150,
+        "overall_theme": "tutorial",
+        "style": "calm",
+        "script_mode": mode,
+        "default_recorder": "auto",
+        "video_learning_objectives": [
+            f"Install {package_name} safely and verify the setup",
+            "Navigate the official docs and locate the quickstart",
+            "Find examples in the official repository",
+        ],
+        "scenes": [
+            {
+                "type": "browser",
+                "url": docs_url_final,
+                "duration": 45,
+                "description": "Open the docs and locate the quickstart",
+                "transition_in": "fade",
+                "transition_duration": 0.6,
+                "learning_objective": "Find the quickstart in the official docs.",
+                "concept_explanation": summary,
+                "demo_steps": [
+                    {"action": "wait", "value": 2, "description": "Let the docs load"},
+                    {"action": "click", "selector": "text=/Quickstart|Getting Started|Get Started|Introduction|Overview/i", "description": "Open the getting started section"},
+                    {"action": "scroll", "value": 800, "description": "Scroll through the overview"},
+                    {"action": "click", "selector": "text=/Installation|Install|Setup/i", "description": "Jump to installation"},
+                    {"action": "scroll", "value": 900, "description": "Review setup steps"},
+                ],
+            },
+            {
+                "type": "terminal",
+                "commands": [
+                    install_cmd,
+                    f"python -m pip show {package_name}",
+                ],
+                "duration": 55,
+                "description": "Install and verify the package safely",
+                "transition_in": "slide_left",
+                "transition_duration": 0.6,
+                "learning_objective": "Install and verify locally.",
+                "concept_explanation": "Installing in an isolated environment keeps your system clean.",
+                "common_mistakes": [
+                    "Installing into the wrong Python environment",
+                    "Skipping the verification step",
+                ],
+                "key_takeaway": "Always confirm the install succeeded before moving on.",
+            },
+            {
+                "type": "browser",
+                "url": repo_url_final,
+                "duration": 45,
+                "description": "Review the official repository for examples",
+                "transition_in": "wipe_left",
+                "transition_duration": 0.6,
+                "learning_objective": "Use the repo README to find examples and references.",
+                "demo_steps": [
+                    {"action": "wait", "value": 2, "description": "Let the repo load"},
+                    {"action": "scroll", "value": 700, "description": "Scroll through the README"},
+                    {"action": "scroll", "value": 900, "description": "Scan for examples and setup notes"},
+                ],
+            },
+        ],
+        "include_subscribe_cta": False,
+    }
+
+    manifest_path = RECORDINGS_DIR / f"{project_id}.yaml"
+    import yaml
+    with open(manifest_path, "w") as f:
+        yaml.safe_dump(manifest, f, sort_keys=False)
+
+    console.print(Panel(
+        f"[bold blue]Auto How-To Pipeline[/bold blue]\n"
+        f"Title: {topic_title}\n"
+        f"Docs: {docs_url_final}\n"
+        f"Repo: {repo_url_final}\n"
+        f"Project: {project_id}",
+        title="AI News Video Automator"
+    ))
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task1 = progress.add_task("[1/4] Recording scenes...", total=None)
+        record_result = asyncio.run(record_from_manifest(str(manifest_path), recorder=recorder))
+        if not record_result["success"]:
+            progress.update(task1, description="[1/4] Recording failed")
+            console.print("[bold red]Scene recording failed.[/bold red]")
+            return
+
+        progress.update(task1, completed=True, description=f"[1/4] Recorded {record_result['scene_count']} scenes")
+
+        scenes_file = Path(record_result["scenes_file"])
+        with open(scenes_file) as f:
+            scenes_data = json.load(f)
+
+        all_actions = []
+        for scene in scenes_data.get("scenes", []):
+            for ts in scene.get("timestamps", []):
+                ts["scene_index"] = scene.get("scene_index", 0)
+                ts["scene_type"] = scene.get("scene_type", "unknown")
+                all_actions.append(ts)
+
+        combined_timestamps = {
+            "project_id": project_id,
+            "url": topic_title,
+            "duration_seconds": record_result["total_duration"],
+            "actions": sorted(all_actions, key=lambda x: x.get("time_seconds", 0))
+        }
+
+        timestamps_file = RECORDINGS_DIR / f"{project_id}_timestamps.json"
+        with open(timestamps_file, "w") as f:
+            json.dump(combined_timestamps, f, indent=2)
+
+        task2 = progress.add_task("[2/4] Generating script...", total=None)
+        educational_context = build_educational_context(manifest)
+        script_result = generate_script(
+            str(timestamps_file),
+            topic_title,
+            mode=mode,
+            educational_context=educational_context
+        )
+        progress.update(task2, completed=True, description="[2/4] Script generated")
+
+        task3 = progress.add_task("[3/4] Generating voice...", total=None)
+        script_path = RECORDINGS_DIR / f"{project_id}_script.json"
+        generate_voice(str(script_path))
+        progress.update(task3, completed=True, description="[3/4] Voice generated")
+
+        task4 = progress.add_task("[4/4] Assembling with transitions...", total=None)
+        assemble_result = assemble_scenes(project_id)
+        progress.update(task4, completed=True, description="[4/4] Video assembled")
+
+    if assemble_result["success"]:
+        console.print(Panel(
+            f"[bold green]Auto How-To Created![/bold green]\n\n"
+            f"Title: {script_result['title']}\n"
+            f"Scenes: {assemble_result['scene_count']}\n"
+            f"Duration: {assemble_result['duration']:.1f}s\n"
+            f"Output: {assemble_result['output_file']}\n",
+            title="Complete",
+            border_style="green"
+        ))
+    else:
+        console.print(f"[bold red]Pipeline failed:[/bold red] {assemble_result['message']}")
+
+
 @cli.command()
 @click.option("--project", required=True, help="Project ID to publish")
 @click.option("--schedule-day", default=None, help="Day to publish (tuesday, friday)")
@@ -639,7 +1129,14 @@ def scene_init(manifest_type: str, project_id: str, output: str):
 
 @cli.command("scene-record")
 @click.option("--manifest", required=True, help="Path to scene manifest YAML/JSON")
-def scene_record(manifest: str):
+@click.option(
+    "--recorder",
+    default=None,
+    type=click.Choice(["auto", "screen_capture", "rendered"], case_sensitive=False),
+    show_default=False,
+    help="Override recording backend"
+)
+def scene_record(manifest: str, recorder: str):
     """Record all scenes from a manifest file."""
     from modules.scene_recorder import record_from_manifest
 
@@ -652,7 +1149,7 @@ def scene_record(manifest: str):
     ) as progress:
         task = progress.add_task("Recording scenes...", total=None)
 
-        result = asyncio.run(record_from_manifest(manifest))
+        result = asyncio.run(record_from_manifest(manifest, recorder=recorder))
 
         progress.update(task, completed=True)
 
@@ -694,9 +1191,16 @@ def scene_record(manifest: str):
 @cli.command("scene-script")
 @click.option("--project", required=True, help="Project ID to generate script for")
 @click.option("--topic", default=None, help="Optional topic override")
-def scene_script(project: str, topic: str):
+@click.option(
+    "--mode",
+    default=None,
+    type=click.Choice(["tutorial", "howto", "news"], case_sensitive=False),
+    show_default=False,
+    help="Override script mode"
+)
+def scene_script(project: str, topic: str, mode: str):
     """Generate script from recorded scenes."""
-    from modules.scripter import ScriptGenerator
+    from modules.scripter import generate_script
 
     scenes_file = RECORDINGS_DIR / f"{project}_scenes.json"
 
@@ -710,6 +1214,13 @@ def scene_script(project: str, topic: str):
 
     manifest = scenes_data.get("manifest", {})
     topic = topic or manifest.get("topic", "")
+    allowed_modes = {"tutorial", "howto", "news"}
+    script_mode = mode or manifest.get("script_mode", "tutorial")
+    if isinstance(script_mode, str):
+        script_mode = script_mode.lower()
+    if script_mode not in allowed_modes:
+        script_mode = "tutorial"
+    educational_context = build_educational_context(manifest)
 
     # Combine all timestamps from all scenes
     all_actions = []
@@ -746,8 +1257,12 @@ def scene_script(project: str, topic: str):
     ) as progress:
         task = progress.add_task("Generating narration with Claude...", total=None)
 
-        from modules.scripter import generate_script
-        result = generate_script(str(timestamps_file), topic)
+        result = generate_script(
+            str(timestamps_file),
+            topic,
+            mode=script_mode,
+            educational_context=educational_context
+        )
 
         progress.update(task, completed=True)
 
@@ -808,7 +1323,21 @@ def scene_assemble(project: str, no_captions: bool):
 @cli.command("scene-create")
 @click.option("--manifest", required=True, help="Path to scene manifest YAML/JSON")
 @click.option("--topic", default=None, help="Optional topic override for script generation")
-def scene_create(manifest: str, topic: str):
+@click.option(
+    "--mode",
+    default=None,
+    type=click.Choice(["tutorial", "howto", "news"], case_sensitive=False),
+    show_default=False,
+    help="Override script mode"
+)
+@click.option(
+    "--recorder",
+    default=None,
+    type=click.Choice(["auto", "screen_capture", "rendered"], case_sensitive=False),
+    show_default=False,
+    help="Override recording backend"
+)
+def scene_create(manifest: str, topic: str, mode: str, recorder: str):
     """Full multi-scene pipeline: Record scenes -> Script -> Voice -> Assemble with transitions."""
     from modules.scene_recorder import record_from_manifest
     from modules.scripter import generate_script
@@ -825,6 +1354,12 @@ def scene_create(manifest: str, topic: str):
 
     manifest_data = load_manifest(manifest)
     project_id = manifest_data.project_id
+    script_mode = mode or manifest_data.script_mode or "tutorial"
+    if isinstance(script_mode, str):
+        script_mode = script_mode.lower()
+    if script_mode not in {"tutorial", "howto", "news"}:
+        script_mode = "tutorial"
+    educational_context = build_educational_context(manifest_data.to_dict())
 
     console.print(Panel(
         f"[bold blue]Multi-Scene Video Pipeline[/bold blue]\n"
@@ -841,7 +1376,7 @@ def scene_create(manifest: str, topic: str):
     ) as progress:
         # Step 1: Record all scenes
         task1 = progress.add_task("[1/4] Recording scenes...", total=None)
-        record_result = asyncio.run(record_from_manifest(manifest))
+        record_result = asyncio.run(record_from_manifest(manifest, recorder=recorder))
 
         if not record_result["success"]:
             progress.update(task1, description="[1/4] Recording failed")
@@ -859,6 +1394,7 @@ def scene_create(manifest: str, topic: str):
         for scene in scenes_data.get("scenes", []):
             for ts in scene.get("timestamps", []):
                 ts["scene_index"] = scene.get("scene_index", 0)
+                ts["scene_type"] = scene.get("scene_type", "unknown")
                 all_actions.append(ts)
 
         combined_timestamps = {
@@ -874,7 +1410,12 @@ def scene_create(manifest: str, topic: str):
 
         # Step 2: Generate script
         task2 = progress.add_task("[2/4] Generating script...", total=None)
-        script_result = generate_script(str(timestamps_file), topic or manifest_data.topic)
+        script_result = generate_script(
+            str(timestamps_file),
+            topic or manifest_data.topic,
+            mode=script_mode,
+            educational_context=educational_context
+        )
         progress.update(task2, completed=True, description="[2/4] Script generated")
 
         # Step 3: Generate voice

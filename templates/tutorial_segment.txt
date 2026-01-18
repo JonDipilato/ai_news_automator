@@ -1,0 +1,5 @@
+Segment structure:
+- Explain the concept before the action.
+- Describe the action tied to the current timestamp.
+- Warn about common mistakes when relevant.
+- End with a key takeaway or a practical tip.
