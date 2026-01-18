@@ -1,0 +1,164 @@
+# Build a REAL CLI Tool from Scratch - Authentic Tutorial
+# Creates a working command-line tool with REAL code and execution
+
+project_id: cli_tool_real
+title: "Build a CLI Tool in 3 Minutes (REAL Python)"
+topic: "Create a working command-line tool from scratch using Python - real code that actually runs"
+target_duration: 180
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Terminal - Introduction and setup
+  - type: terminal
+    commands:
+      - "# Let's build a REAL CLI tool from scratch"
+      - "# This tool will manage your tasks from the terminal"
+      - "mkdir -p ~/cli_tool && cd ~/cli_tool"
+      - "echo 'Project directory created'"
+      - "# Our CLI tool will be able to:"
+      - "echo '- Add tasks'"
+      - "echo '- List tasks'"
+      - "echo '- Mark tasks as done'"
+      - "echo '' && echo 'Let\\'s build it!'"
+    duration: 22
+    description: "Intro and project setup"
+    transition_in: fade
+    transition_duration: 0.5
+    narration_hint: "Hook the viewer - explain what we're building"
+
+  # Scene 2: Terminal - Create the main CLI script (REAL Python code)
+  - type: terminal
+    commands:
+      - "# Create our CLI tool with Python"
+      - "cat > todo.py << 'ENDOFFILE'"
+      - "#!/usr/bin/env python3"
+      - "import sys"
+      - "import json"
+      - "from pathlib import Path"
+      - ""
+      - "TODO_FILE = Path.home() / '.todo_cli.json'"
+      - ""
+      - "def load_todos():"
+      - "    if TODO_FILE.exists():"
+      - "        return json.loads(TODO_FILE.read_text())"
+      - "    return []"
+      - ""
+      - "def save_todos(todos):"
+      - "    TODO_FILE.write_text(json.dumps(todos, indent=2))"
+      - ""
+      - "def cmd_add(args):"
+      - "    task = ' '.join(args)"
+      - "    if not task:"
+      - "        print('Usage: todo add <task>')"
+      - "        return"
+      - "    todos = load_todos()"
+      - "    todos.append({'task': task, 'done': False})"
+      - "    save_todos(todos)"
+      - "    print(f'Added: {task}')"
+      - ""
+      - "def cmd_list():"
+      - "    todos = load_todos()"
+      - "    if not todos:"
+      - "        print('No tasks yet. Add one with: todo add <task>')"
+      - "        return"
+      - "    for i, todo in enumerate(todos, 1):"
+      - "        status = '✓' if todo['done'] else ' '"
+      - "        print(f'{i}. [{status}] {todo[\"task\"]}')"
+      - ""
+      - "def cmd_done(args):"
+      - "    todos = load_todos()"
+      - "    try:"
+      - "        idx = int(args[0]) - 1"
+      - "        todos[idx]['done'] = True"
+      - "        save_todos(todos)"
+      - "        print(f'Marked as done: {todos[idx][\"task\"]}')"
+      - "    except (IndexError, ValueError):"
+      - "        print('Usage: todo done <number>')"
+      - ""
+      - "def main():"
+      - "    if len(sys.argv) < 2:"
+      - "        print('Usage: todo <command> [args]')"
+      - "        print('Commands: add, list, done')"
+      - "        return"
+      - "    cmd = sys.argv[1]"
+      - "    args = sys.argv[2:]"
+      - "    {'add': cmd_add, 'list': cmd_list, 'done': cmd_done}.get(cmd, lambda x: print(f'Unknown command: {cmd}'))(args)"
+      - ""
+      - "if __name__ == '__main__':"
+      - "    main()"
+      - "ENDOFFILE"
+      - "# Our CLI tool is created!"
+      - "wc -l todo.py"
+    duration: 45
+    description: "Write the complete CLI tool - full Python code"
+    transition_in: wipe_left
+    transition_duration: 0.6
+    narration_hint: "Show the code being written - explain the structure"
+
+  # Scene 3: Terminal - Make it executable and test it FOR REAL
+  - type: terminal
+    commands:
+      - "# Make the script executable"
+      - "chmod +x todo.py"
+      - "# Let's test it for REAL!"
+      - "echo '' && echo '--- Testing our CLI tool ---' && echo ''"
+      - "./todo.py"
+      - "./todo.py list"
+    duration: 18
+    description: "Make executable and first test run"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Show it actually runs and responds"
+
+  # Scene 4: Terminal - Add REAL tasks
+  - type: terminal
+    commands:
+      - "# Add some tasks for REAL"
+      - "./todo.py add Learn Python CLI development"
+      - "./todo.py add Build a project from scratch"
+      - "./todo.py add Master the terminal"
+      - "# Tasks added for real!"
+      - "echo '' && echo 'Let\\'s see our tasks:'"
+      - "./todo.py list"
+    duration: 22
+    description: "Add actual tasks to the todo list"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "Show the add command working - real data being stored"
+
+  # Scene 5: Terminal - Mark tasks as done (REAL data modification)
+  - type: terminal
+    commands:
+      - "# Mark a task as complete"
+      - "./todo.py done 1"
+      - "# Check our list again"
+      - "./todo.py list"
+      - "# The task is now marked done!"
+      - "echo '' && echo 'Data persists in:' && ls -la ~/.todo_cli.json"
+      - "cat ~/.todo_cli.json"
+    duration: 25
+    description: "Mark task complete and show persistence"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Show data persistence - tasks are saved to file"
+
+  # Scene 6: Terminal - Show the code one more time and recap
+  - type: terminal
+    commands:
+      - "# Let's see what we built"
+      - "echo '' && echo '=== Our CLI Tool ===' && echo ''"
+      - "head -20 todo.py"
+      - "echo '' && echo '=== File Info ===' && ls -lh todo.py"
+      - "# Fully functional CLI tool in under 60 lines!"
+      - "# Run it from anywhere: cp todo.py /usr/local/bin/todo"
+      - "echo '' && echo '✓ Complete CLI tool built!'"
+    duration: 25
+    description: "Show final code and recap"
+    transition_in: wipe_right
+    transition_duration: 0.6
+    narration_hint: "Recap the value - they built a real tool"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next up - Add colors and progress bars to make your CLI tools look professional"

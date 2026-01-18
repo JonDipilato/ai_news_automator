@@ -529,5 +529,381 @@ def auth_youtube():
         console.print("Get it from: https://console.cloud.google.com/apis/credentials")
 
 
+# ============================================================================
+# MULTI-SCENE COMMANDS (New Interactive Tutorial System)
+# ============================================================================
+
+@cli.command("scene-example")
+def scene_example():
+    """Show an example scene manifest for multi-scene videos."""
+    from modules.scenes import get_example_manifest
+
+    console.print(Panel(
+        "[bold blue]Example Scene Manifest[/bold blue]\n"
+        "Use this as a template for creating multi-scene tutorial videos",
+        title="Multi-Scene System"
+    ))
+
+    example = get_example_manifest()
+    console.print(example)
+
+    console.print("\n[bold green]Save this to a .yaml file and run:[/bold green]")
+    console.print("python main.py scene-create --manifest your_manifest.yaml")
+
+
+@cli.command("scene-init")
+@click.option("--type", "manifest_type", default="tutorial",
+              type=click.Choice(["tutorial", "news"]),
+              help="Type of video (tutorial or news compilation)")
+@click.option("--project-id", default=None, help="Custom project ID")
+@click.option("--output", default=None, help="Output manifest file path")
+def scene_init(manifest_type: str, project_id: str, output: str):
+    """Create a new scene manifest interactively."""
+    from modules.scenes import SceneManifest, Scene, SceneType, TransitionType
+
+    if not project_id:
+        project_id = generate_project_id()
+
+    console.print(Panel(f"[bold blue]Creating Scene Manifest[/bold blue]\nType: {manifest_type}"))
+
+    # Interactive input
+    title = click.prompt("Video title", default=f"New {manifest_type.title()} Video")
+    topic = click.prompt("Topic/description", default="")
+
+    scenes = []
+    scene_num = 1
+
+    console.print("\n[yellow]Add scenes (enter 'done' to finish):[/yellow]")
+
+    while True:
+        console.print(f"\n[cyan]Scene {scene_num}:[/cyan]")
+
+        scene_type = click.prompt(
+            "Type",
+            type=click.Choice(["terminal", "browser", "article", "done"]),
+            default="browser" if manifest_type == "news" else "terminal"
+        )
+
+        if scene_type == "done":
+            break
+
+        if scene_type == "terminal":
+            commands = click.prompt("Commands (comma-separated)", default="")
+            command_list = [c.strip() for c in commands.split(",") if c.strip()]
+            scene = Scene(
+                type=SceneType.TERMINAL,
+                commands=command_list,
+                duration=click.prompt("Duration (seconds)", type=int, default=20),
+                description=click.prompt("Description", default="Terminal commands"),
+                transition_in=TransitionType.WIPE_LEFT
+            )
+        else:
+            url = click.prompt("URL")
+            scene = Scene(
+                type=SceneType.BROWSER if scene_type == "browser" else SceneType.ARTICLE,
+                url=url,
+                duration=click.prompt("Duration (seconds)", type=int, default=30),
+                description=click.prompt("Description", default=f"Showing {url}"),
+                transition_in=TransitionType.ZOOM_IN if scene_num > 1 else TransitionType.FADE
+            )
+
+        scenes.append(scene)
+        scene_num += 1
+
+    if not scenes:
+        console.print("[yellow]No scenes added. Exiting.[/yellow]")
+        return
+
+    # Create manifest
+    manifest = SceneManifest(
+        project_id=project_id,
+        title=title,
+        topic=topic,
+        scenes=scenes,
+        overall_theme=manifest_type,
+        style="energetic",
+        include_subscribe_cta=True
+    )
+
+    # Save manifest
+    if output:
+        output_path = Path(output)
+    else:
+        output_path = RECORDINGS_DIR / f"{project_id}_manifest.yaml"
+
+    manifest.save(output_path)
+
+    console.print(f"\n[bold green]Manifest saved to:[/bold green] {output_path}")
+    console.print(f"[bold green]To record:[/bold green] python main.py scene-record --manifest {output_path}")
+
+
+@cli.command("scene-record")
+@click.option("--manifest", required=True, help="Path to scene manifest YAML/JSON")
+def scene_record(manifest: str):
+    """Record all scenes from a manifest file."""
+    from modules.scene_recorder import record_from_manifest
+
+    console.print(Panel(f"[bold blue]Recording Scenes[/bold blue]\nManifest: {manifest}"))
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("Recording scenes...", total=None)
+
+        result = asyncio.run(record_from_manifest(manifest))
+
+        progress.update(task, completed=True)
+
+    if result["success"]:
+        table = Table(title="Recording Complete")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Project ID", result["project_id"])
+        table.add_row("Scenes Recorded", str(result["scene_count"]))
+        table.add_row("Total Duration", f"{result['total_duration']:.1f}s")
+        table.add_row("Scenes File", result["scenes_file"])
+
+        console.print(table)
+
+        # Show scene breakdown
+        scene_table = Table(title="Scene Breakdown")
+        scene_table.add_column("#", style="cyan")
+        scene_table.add_column("Type", style="yellow")
+        scene_table.add_column("Duration", style="green")
+        scene_table.add_column("Status", style="magenta")
+
+        for i, scene in enumerate(result.get("scenes", []), 1):
+            status = "[green]OK[/green]" if scene.get("success") else f"[red]{scene.get('error', 'Failed')}[/red]"
+            scene_table.add_row(
+                str(i),
+                scene.get("scene_type", "unknown"),
+                f"{scene.get('duration', 0):.1f}s",
+                status
+            )
+
+        console.print(scene_table)
+
+        console.print(f"\n[bold green]Next step:[/bold green] python main.py scene-script --project {result['project_id']}")
+    else:
+        console.print("[bold red]Recording failed. Check scene errors above.[/bold red]")
+
+
+@cli.command("scene-script")
+@click.option("--project", required=True, help="Project ID to generate script for")
+@click.option("--topic", default=None, help="Optional topic override")
+def scene_script(project: str, topic: str):
+    """Generate script from recorded scenes."""
+    from modules.scripter import ScriptGenerator
+
+    scenes_file = RECORDINGS_DIR / f"{project}_scenes.json"
+
+    if not scenes_file.exists():
+        console.print(f"[bold red]Error:[/bold red] Scenes file not found: {scenes_file}")
+        console.print("Run scene-record first.")
+        return
+
+    with open(scenes_file) as f:
+        scenes_data = json.load(f)
+
+    manifest = scenes_data.get("manifest", {})
+    topic = topic or manifest.get("topic", "")
+
+    # Combine all timestamps from all scenes
+    all_actions = []
+    for scene in scenes_data.get("scenes", []):
+        for ts in scene.get("timestamps", []):
+            ts["scene_index"] = scene.get("scene_index", 0)
+            ts["scene_type"] = scene.get("scene_type", "unknown")
+            all_actions.append(ts)
+
+    # Create combined timestamps file
+    combined_timestamps = {
+        "project_id": project,
+        "url": manifest.get("title", project),
+        "duration_seconds": scenes_data.get("total_duration", 60),
+        "actions": sorted(all_actions, key=lambda x: x.get("time_seconds", 0))
+    }
+
+    timestamps_file = RECORDINGS_DIR / f"{project}_timestamps.json"
+    with open(timestamps_file, "w") as f:
+        json.dump(combined_timestamps, f, indent=2)
+
+    console.print(Panel("[bold blue]Generating Script for Multi-Scene Video[/bold blue]"))
+
+    # Validate API keys
+    missing = validate_api_keys()
+    if "ANTHROPIC_API_KEY" in missing:
+        console.print("[bold red]Error:[/bold red] ANTHROPIC_API_KEY not configured in .env")
+        return
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("Generating narration with Claude...", total=None)
+
+        from modules.scripter import generate_script
+        result = generate_script(str(timestamps_file), topic)
+
+        progress.update(task, completed=True)
+
+    table = Table(title="Script Generated")
+    table.add_column("Property", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Title", result["title"])
+    table.add_row("Segments", str(len(result["segments"])))
+    table.add_row("Word Count", str(result["word_count"]))
+
+    console.print(table)
+    console.print(Panel(result["hook"], title="Hook Preview", border_style="yellow"))
+    console.print(Panel(result["outro"], title="Outro Preview", border_style="green"))
+
+    script_path = RECORDINGS_DIR / f"{project}_script.json"
+    console.print(f"\n[bold green]Next step:[/bold green] python main.py voice --script {script_path}")
+
+
+@cli.command("scene-assemble")
+@click.option("--project", required=True, help="Project ID to assemble")
+@click.option("--no-captions", is_flag=True, help="Skip caption generation")
+def scene_assemble(project: str, no_captions: bool):
+    """Assemble multi-scene video with transitions."""
+    from modules.scene_assembler import assemble_scenes
+
+    console.print(Panel(f"[bold blue]Assembling Multi-Scene Video[/bold blue]\nProject: {project}"))
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("Assembling scenes with transitions...", total=None)
+
+        result = assemble_scenes(project, with_captions=not no_captions)
+
+        progress.update(task, completed=True)
+
+    if result["success"]:
+        table = Table(title="Video Assembled")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="green")
+
+        table.add_row("Output", result["output_file"])
+        table.add_row("Duration", f"{result['duration']:.1f}s")
+        table.add_row("Scenes", str(result["scene_count"]))
+        table.add_row("Transitions", "Yes" if result["has_transitions"] else "No")
+        table.add_row("Captions", "Yes" if result["has_captions"] else "No")
+
+        console.print(table)
+        console.print(f"\n[bold yellow]Review video at:[/bold yellow] {result['output_file']}")
+        console.print(f"[bold green]When ready:[/bold green] python main.py approve --project {project}")
+    else:
+        console.print(f"[bold red]Assembly failed:[/bold red] {result['message']}")
+
+
+@cli.command("scene-create")
+@click.option("--manifest", required=True, help="Path to scene manifest YAML/JSON")
+@click.option("--topic", default=None, help="Optional topic override for script generation")
+def scene_create(manifest: str, topic: str):
+    """Full multi-scene pipeline: Record scenes -> Script -> Voice -> Assemble with transitions."""
+    from modules.scene_recorder import record_from_manifest
+    from modules.scripter import generate_script
+    from modules.voice import generate_voice
+    from modules.scene_assembler import assemble_scenes
+    from modules.scenes import load_manifest
+
+    # Validate API keys
+    missing = validate_api_keys()
+    if missing:
+        console.print(f"[bold red]Missing API keys:[/bold red] {', '.join(missing)}")
+        console.print("Configure these in your .env file")
+        return
+
+    manifest_data = load_manifest(manifest)
+    project_id = manifest_data.project_id
+
+    console.print(Panel(
+        f"[bold blue]Multi-Scene Video Pipeline[/bold blue]\n"
+        f"Title: {manifest_data.title}\n"
+        f"Scenes: {len(manifest_data.scenes)}\n"
+        f"Project: {project_id}",
+        title="AI News Video Automator"
+    ))
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        # Step 1: Record all scenes
+        task1 = progress.add_task("[1/4] Recording scenes...", total=None)
+        record_result = asyncio.run(record_from_manifest(manifest))
+
+        if not record_result["success"]:
+            progress.update(task1, description="[1/4] Recording failed")
+            console.print("[bold red]Scene recording failed.[/bold red]")
+            return
+
+        progress.update(task1, completed=True, description=f"[1/4] Recorded {record_result['scene_count']} scenes")
+
+        # Create combined timestamps for script generation
+        scenes_file = Path(record_result["scenes_file"])
+        with open(scenes_file) as f:
+            scenes_data = json.load(f)
+
+        all_actions = []
+        for scene in scenes_data.get("scenes", []):
+            for ts in scene.get("timestamps", []):
+                ts["scene_index"] = scene.get("scene_index", 0)
+                all_actions.append(ts)
+
+        combined_timestamps = {
+            "project_id": project_id,
+            "url": manifest_data.title,
+            "duration_seconds": record_result["total_duration"],
+            "actions": sorted(all_actions, key=lambda x: x.get("time_seconds", 0))
+        }
+
+        timestamps_file = RECORDINGS_DIR / f"{project_id}_timestamps.json"
+        with open(timestamps_file, "w") as f:
+            json.dump(combined_timestamps, f, indent=2)
+
+        # Step 2: Generate script
+        task2 = progress.add_task("[2/4] Generating script...", total=None)
+        script_result = generate_script(str(timestamps_file), topic or manifest_data.topic)
+        progress.update(task2, completed=True, description="[2/4] Script generated")
+
+        # Step 3: Generate voice
+        script_path = RECORDINGS_DIR / f"{project_id}_script.json"
+        task3 = progress.add_task("[3/4] Generating voice...", total=None)
+        voice_result = generate_voice(str(script_path))
+        progress.update(task3, completed=True, description="[3/4] Voice generated")
+
+        # Step 4: Assemble with transitions
+        task4 = progress.add_task("[4/4] Assembling with transitions...", total=None)
+        assemble_result = assemble_scenes(project_id)
+        progress.update(task4, completed=True, description="[4/4] Video assembled")
+
+    if assemble_result["success"]:
+        console.print(Panel(
+            f"[bold green]Multi-Scene Video Created![/bold green]\n\n"
+            f"Title: {script_result['title']}\n"
+            f"Scenes: {assemble_result['scene_count']}\n"
+            f"Duration: {assemble_result['duration']:.1f}s\n"
+            f"Transitions: {'Yes' if assemble_result['has_transitions'] else 'No'}\n"
+            f"Output: {assemble_result['output_file']}\n\n"
+            f"[yellow]Review the video, then run:[/yellow]\n"
+            f"python main.py approve --project {project_id}",
+            title="Complete",
+            border_style="green"
+        ))
+    else:
+        console.print(f"[bold red]Pipeline failed:[/bold red] {assemble_result['message']}")
+
+
 if __name__ == "__main__":
     cli()

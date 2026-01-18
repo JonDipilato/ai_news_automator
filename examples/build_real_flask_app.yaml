@@ -1,0 +1,193 @@
+# Build a Real Web App from Scratch - Live Demo
+# Creates a working Flask Todo App with zero mockups
+
+project_id: build_real_flask_app
+title: "Build a Real Web App in 3 Minutes (Flask Tutorial)"
+topic: "Create a fully functional Flask web application from scratch - live coding with real results"
+target_duration: 200
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Hook - Show what we're building (browser to example)
+  - type: browser
+    url: "https://flask.palletsprojects.com/"
+    duration: 18
+    description: "Show Flask homepage - this is what we're using"
+    transition_in: fade
+    transition_duration: 0.5
+    prompt: "What is Flask?"
+    narration_hint: "Introduce Flask - micro web framework, show it's real"
+
+  # Scene 2: Terminal - Create project and install Flask
+  - type: terminal
+    commands:
+      - "# Let's build a real web app from scratch"
+      - "mkdir -p ~/my_todo_app && cd ~/my_todo_app"
+      - "echo 'Creating Flask todo app...'"
+      - "pip3 install flask -q 2>/dev/null || pip install flask -q"
+      - "# Flask installed - let's create the app"
+    duration: 28
+    description: "Create project directory and install Flask for real"
+    transition_in: wipe_left
+    transition_duration: 0.6
+    narration_hint: "Show real installation happening"
+
+  # Scene 3: Terminal - Create the Python Flask app
+  - type: terminal
+    commands:
+      - "# Create the main app file"
+      - "cat > app.py << 'EOF'"
+      - "from flask import Flask, render_template, request, redirect, url_for"
+      - "import json"
+      - "import os"
+      - ""
+      - "app = Flask(__name__)"
+      - "DATA_FILE = 'todos.json'"
+      - ""
+      - "def load_todos():"
+      - "    if os.path.exists(DATA_FILE):"
+      - "        with open(DATA_FILE, 'r') as f:"
+      - "            return json.load(f)"
+      - "    return []"
+      - ""
+      - "def save_todos(todos):"
+      - "    with open(DATA_FILE, 'w') as f:"
+      - "        json.dump(todos, f, indent=2)"
+      - ""
+      - "@app.route('/')"
+      - "def index():"
+      - "    todos = load_todos()"
+      - "    return render_template('index.html', todos=todos)"
+      - ""
+      - "@app.route('/add', methods=['POST'])"
+      - "def add():"
+      - "    todo = request.form.get('todo')"
+      - "    if todo:"
+      - "        todos = load_todos()"
+      - "        todos.append({'text': todo, 'done': False})"
+      - "        save_todos(todos)"
+      - "    return redirect(url_for('index'))"
+      - ""
+      - "@app.route('/toggle/<int:index>')"
+      - "def toggle(index):"
+      - "    todos = load_todos()"
+      - "    if 0 <= index < len(todos):"
+      - "        todos[index]['done'] = not todos[index]['done']"
+      - "        save_todos(todos)"
+      - "    return redirect(url_for('index'))"
+      - ""
+      - "if __name__ == '__main__':"
+      - "    app.run(debug=True, port=5000)"
+      - "EOF"
+      - "# That's our backend - now let's create the frontend"
+    duration: 40
+    description: "Write the actual Flask backend code - full CRUD app"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Show the code being written - explain each part briefly"
+
+  # Scene 4: Terminal - Create templates directory and HTML
+  - type: terminal
+    commands:
+      - "# Create the templates folder"
+      - "mkdir -p ~/my_todo_app/templates"
+      - "# Now create the HTML template"
+      - "cat > ~/my_todo_app/templates/index.html << 'EOF'"
+      - "<!DOCTYPE html>"
+      - "<html>"
+      - "<head>"
+      - "    <title>My Todo App</title>"
+      - "    <style>"
+      - "        * { margin: 0; padding: 0; box-sizing: border-box; }"
+      - "        body { font-family: system-ui; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; padding: 40px; }"
+      - "        .container { max-width: 500px; margin: 0 auto; }"
+      - "        h1 { color: #eee; text-align: center; margin-bottom: 30px; }"
+      - "        .input-group { display: flex; gap: 10px; margin-bottom: 30px; }"
+      - "        input[type='text'] { flex: 1; padding: 15px; border: none; border-radius: 8px; font-size: 16px; }"
+      - "        button { padding: 15px 30px; border: none; border-radius: 8px; background: #4CAF50; color: white; font-size: 16px; cursor: pointer; }"
+      - "        button:hover { background: #45a049; }"
+      - "        .todo-item { background: rgba(255,255,255,0.1); padding: 15px; margin: 10px 0; border-radius: 8px; display: flex; align-items: center; gap: 10px; }"
+      - "        .todo-item.done { opacity: 0.5; text-decoration: line-through; }"
+      - "        .todo-item button { background: #2196F3; padding: 8px 16px; }"
+      - "    </style>"
+      - "</head>"
+      - "<body>"
+      - "    <div class='container'>"
+      - "        <h1>My Todo List</h1>"
+      - "        <form method='POST' action='/add'>"
+      - "            <div class='input-group'>"
+      - "                <input type='text' name='todo' placeholder='Add a new task...' required>"
+      - "                <button type='submit'>Add</button>"
+      - "            </div>"
+      - "        </form>"
+      - "        {% for todo in todos %}"
+      - "        <div class='todo-item {{ 'done' if todo.done else '' }}'>"
+      - "            <span>{{ todo.text }}</span>"
+      - "            <a href='/toggle/{{ loop.index0 }}'><button>Toggle</button></a>"
+      - "        </div>"
+      - "        {% endfor %}"
+      - "    </div>"
+      - "</body>"
+      - "</html>"
+      - "EOF"
+      - "# Frontend complete - now let's run it!"
+    duration: 45
+    description: "Create the HTML/CSS template - modern design included"
+    transition_in: wipe_right
+    transition_duration: 0.6
+    narration_hint: "Show the HTML being created - it's a complete modern UI"
+
+  # Scene 5: Terminal - Start the Flask server
+  - type: terminal
+    commands:
+      - "# Now let's start our web server"
+      - "cd ~/my_todo_app && python3 app.py &"
+      - "# Server running on http://localhost:5000"
+      - "sleep 2 && curl -s http://localhost:5000 | head -20"
+      - "# App is live! Let's verify it's working"
+      - "echo '[{\"text\": \"Learn Flask\", \"done\": false}]' > ~/my_todo_app/todos.json"
+      - "curl -s http://localhost:5000 | grep -o 'My Todo List'"
+      - "# It's working! Real web app running!"
+    duration: 30
+    description: "Start the Flask server and verify it's actually running"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "This is the payoff - server is running and responding"
+
+  # Scene 6: Browser - Show a real working Flask app example online
+  - type: browser
+    url: "https://pythonhosted.org/Flask/"
+    duration: 20
+    description: "Show Flask documentation - this is production-grade tech"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Reinforce this is real tech used by millions"
+
+  # Scene 7: Terminal - Show what we built
+  - type: terminal
+    commands:
+      - "# In just a few minutes, we built:"
+      - "ls -la ~/my_todo_app/"
+      - "echo '' && echo '=== app.py (backend) ===' && head -15 ~/my_todo_app/app.py"
+      - "echo '' && echo '=== templates/index.html (frontend) ===' && head -10 ~/my_todo_app/templates/index.html"
+      - "# Full CRUD app with persistence!"
+      - "echo 'Run it yourself: cd ~/my_todo_app && python3 app.py'"
+    duration: 25
+    description: "Recap what was built - full stack app in minutes"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Summarize the value - they can do this too"
+
+  # Scene 8: Browser - Flask tutorial for more learning
+  - type: article
+    url: "https://flask.palletsprojects.com/en/latest/quickstart/"
+    duration: 18
+    description: "Quickstart guide - where to learn more"
+    transition_in: fade
+    transition_duration: 0.5
+    narration_hint: "Give them next steps - link to resources"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next up - Build a web scraper that extracts real data from any website"

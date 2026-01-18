@@ -1,0 +1,73 @@
+# Real AI Demo - Tests actual interactions
+# Uses sites that work and shows real typing/clicking
+
+project_id: ai_demo_real
+title: "AI Tools Demo - Real Interactions"
+topic: "Demonstrating AI coding tools with real browser interactions"
+target_duration: 120
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Terminal intro with typing animation (15 sec)
+  - type: terminal
+    commands:
+      - "# Welcome to AI Coding Tools!"
+      - "echo 'Lets explore some amazing AI tools'"
+      - "ls ~/projects"
+      - "# First, lets check out some websites"
+    duration: 15
+    description: "Terminal intro with animated typing"
+    transition_in: fade
+    narration_hint: "Set the stage with energy"
+
+  # Scene 2: GitHub Copilot - scroll and highlight (25 sec)
+  - type: article
+    url: "https://github.com/features/copilot"
+    duration: 25
+    description: "GitHub Copilot features page with cursor highlights"
+    transition_in: slide_left
+    narration_hint: "Explain Copilot's AI coding features"
+
+  # Scene 3: Anthropic Claude page (25 sec)
+  - type: browser
+    url: "https://www.anthropic.com/claude"
+    duration: 25
+    description: "Anthropic Claude page - scroll and highlight"
+    transition_in: zoom_in
+    narration_hint: "Introduce Claude as a powerful AI"
+
+  # Scene 4: Terminal showing Claude commands (20 sec)
+  - type: terminal
+    commands:
+      - "# Install Claude Code"
+      - "npm install -g @anthropic-ai/claude-code"
+      - "claude --version"
+      - "# Ready to code with AI!"
+    duration: 20
+    description: "Show Claude Code installation"
+    transition_in: wipe_right
+    narration_hint: "Show how easy it is to install"
+
+  # Scene 5: Cursor.sh website (20 sec)
+  - type: article
+    url: "https://cursor.sh"
+    duration: 20
+    description: "Cursor IDE - AI-first code editor"
+    transition_in: crossfade
+    narration_hint: "Another great AI coding tool"
+
+  # Scene 6: Closing terminal (15 sec)
+  - type: terminal
+    commands:
+      - "# Thats a wrap!"
+      - "# Subscribe for more AI tutorials"
+      - "echo 'Happy coding!'"
+    duration: 15
+    description: "Closing with call-to-action"
+    transition_in: slide_left
+    narration_hint: "Strong close with CTA"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next up - Building a full app with AI assistance"

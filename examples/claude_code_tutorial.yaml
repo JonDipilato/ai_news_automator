@@ -1,0 +1,123 @@
+# Claude Code Tutorial - Interactive How-To
+# Shows real terminal usage with Claude Code and moves between scenes
+
+project_id: claude_code_howto
+title: "Master Claude Code in 5 Minutes - Complete Beginner Tutorial"
+topic: "Step-by-step guide to installing and using Claude Code, the AI-powered CLI coding assistant"
+target_duration: 300
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Hook - Terminal intro (20 seconds)
+  - type: terminal
+    commands:
+      - "# Welcome to Claude Code!"
+      - "# The AI assistant that codes FOR you"
+      - "claude --version"
+    duration: 20
+    description: "Opening hook showing Claude Code CLI"
+    transition_in: fade
+    transition_duration: 0.8
+    narration_hint: "Start with excitement - show that Claude Code is game-changing"
+
+  # Scene 2: Installation in terminal (35 seconds)
+  - type: terminal
+    commands:
+      - "# Step 1: Install Claude Code"
+      - "npm install -g @anthropic-ai/claude-code"
+      - "# Verify installation"
+      - "claude --help"
+    duration: 35
+    description: "Installing Claude Code via npm"
+    transition_in: slide_left
+    transition_duration: 0.6
+    narration_hint: "Explain installation is simple - just one command"
+
+  # Scene 3: Claude website overview (40 seconds)
+  - type: browser
+    url: "https://www.anthropic.com/claude"
+    duration: 40
+    description: "Anthropic's Claude page - what powers Claude Code"
+    highlight_elements:
+      - "h1"
+      - ".hero"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "Explain what Claude is and why it's different from other AI"
+
+  # Scene 4: First project setup (40 seconds)
+  - type: terminal
+    commands:
+      - "# Step 2: Start a new project"
+      - "mkdir my-ai-project && cd my-ai-project"
+      - "claude"
+      - "# Now you can ask Claude anything!"
+    duration: 40
+    description: "Setting up first project with Claude Code"
+    transition_in: wipe_right
+    transition_duration: 0.5
+    narration_hint: "Show how easy it is to get started - just type claude"
+
+  # Scene 5: GitHub Copilot comparison (35 seconds)
+  - type: article
+    url: "https://github.com/features/copilot"
+    duration: 35
+    description: "Compare with GitHub Copilot"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Compare Claude Code vs Copilot - what makes each unique"
+
+  # Scene 6: Real coding demo (45 seconds)
+  - type: terminal
+    commands:
+      - "# Step 3: Ask Claude to write code"
+      - "# Example: Create a REST API"
+      - "echo 'Create a simple Express.js REST API with user CRUD operations'"
+      - "# Claude writes the code automatically!"
+    duration: 45
+    description: "Demonstrating Claude Code writing actual code"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "This is the magic moment - show Claude generating real code"
+
+  # Scene 7: Cursor IDE (30 seconds)
+  - type: browser
+    url: "https://cursor.sh"
+    duration: 30
+    description: "Cursor IDE - another AI coding tool"
+    highlight_elements:
+      - ".hero-title"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "Quick mention of Cursor as complementary tool"
+
+  # Scene 8: Advanced features (40 seconds)
+  - type: terminal
+    commands:
+      - "# Pro Tips"
+      - "claude /help"
+      - "# Use slash commands for quick actions"
+      - "# /commit - auto commit message"
+      - "# /test - run tests"
+    duration: 40
+    description: "Advanced Claude Code features"
+    transition_in: wipe_left
+    transition_duration: 0.5
+    narration_hint: "Share power user tips that make viewers feel like insiders"
+
+  # Scene 9: Closing CTA (15 seconds)
+  - type: terminal
+    commands:
+      - "# Start coding smarter today!"
+      - "# Subscribe for more AI tutorials"
+      - "claude"
+    duration: 15
+    description: "Closing with call-to-action"
+    transition_in: zoom_in
+    transition_duration: 0.5
+    narration_hint: "Strong close - tell them to subscribe and try it themselves"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next video - I'll show you 10 Claude Code tricks that will blow your mind"

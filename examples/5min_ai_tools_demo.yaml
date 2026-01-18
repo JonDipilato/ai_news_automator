@@ -1,0 +1,111 @@
+# 5-Minute AI Coding Tools Demo
+# Full showcase of multi-scene capabilities with engaging transitions
+
+project_id: ai_tools_demo_5min
+title: "5 AI Coding Tools That Will 10x Your Productivity"
+topic: "Showcasing the best AI coding assistants and how to use them effectively for maximum developer productivity"
+target_duration: 300
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Hook - Terminal opening (15 seconds)
+  - type: terminal
+    commands:
+      - "echo 'AI is changing how we code...'"
+      - "# Let me show you the best tools'"
+    duration: 15
+    description: "Opening hook in terminal - sets the tech-savvy tone"
+    transition_in: fade
+    transition_duration: 0.8
+    narration_hint: "Start with energy - hook viewers immediately with a bold claim"
+
+  # Scene 2: Claude.ai website (45 seconds)
+  - type: browser
+    url: "https://claude.ai"
+    duration: 45
+    description: "Showcasing Claude AI interface and capabilities"
+    highlight_elements:
+      - "h1"
+      - ".conversation-input"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "Explain what Claude is, why it's different, mention Claude Code"
+
+  # Scene 3: GitHub Copilot docs (40 seconds)
+  - type: article
+    url: "https://github.com/features/copilot"
+    duration: 40
+    description: "GitHub Copilot features and integration"
+    transition_in: wipe_left
+    transition_duration: 0.6
+    narration_hint: "Compare to Claude, show where Copilot shines"
+
+  # Scene 4: Terminal - Show a quick demo (35 seconds)
+  - type: terminal
+    commands:
+      - "cd ~/projects"
+      - "# Using AI to generate code..."
+      - "echo 'function fibonacci(n) { return n <= 1 ? n : fibonacci(n-1) + fibonacci(n-2); }'"
+    duration: 35
+    description: "Quick terminal demo of AI-generated code"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Show practical example - this is where viewers learn"
+
+  # Scene 5: Cursor IDE (45 seconds)
+  - type: browser
+    url: "https://cursor.sh"
+    duration: 45
+    description: "Cursor - the AI-first code editor"
+    highlight_elements:
+      - ".hero-title"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "This is newer, explain why it's exciting for developers"
+
+  # Scene 6: V0 by Vercel (40 seconds)
+  - type: article
+    url: "https://v0.dev"
+    duration: 40
+    description: "V0 - AI-powered UI generation"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Frontend developers will love this - show the magic"
+
+  # Scene 7: Practical terminal workflow (35 seconds)
+  - type: terminal
+    commands:
+      - "# My daily workflow with AI tools"
+      - "git status"
+      - "# AI helps me write better commits"
+      - "git add ."
+    duration: 35
+    description: "Real workflow demonstration"
+    transition_in: wipe_right
+    transition_duration: 0.5
+    narration_hint: "Make it relatable - this is what they can do tomorrow"
+
+  # Scene 8: Future of AI coding (30 seconds)
+  - type: browser
+    url: "https://www.anthropic.com"
+    duration: 30
+    description: "Where AI coding is heading - Anthropic's vision"
+    transition_in: slide_left
+    transition_duration: 0.6
+    narration_hint: "End with forward-looking content, build excitement"
+
+  # Scene 9: Final terminal CTA (15 seconds)
+  - type: terminal
+    commands:
+      - "# Start using AI tools today!"
+      - "# Subscribe for more tips"
+    duration: 15
+    description: "Closing with call-to-action"
+    transition_in: zoom_in
+    transition_duration: 0.5
+    narration_hint: "Strong close with clear CTA"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next video - I'll show you my complete AI-powered development setup from scratch"

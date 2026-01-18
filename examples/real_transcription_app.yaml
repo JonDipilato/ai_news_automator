@@ -1,0 +1,125 @@
+# Build a Real-Time Voice Transcription App in 3 Minutes
+# REAL tutorial - no mockups, actual working demo
+
+project_id: real_transcription_app
+title: "Build a Real-Time Voice Transcription App in 3 Minutes"
+topic: "Create a working voice-to-text app using Python and OpenAI Whisper - from zero to working demo"
+target_duration: 180
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Hook - Terminal with typing animation (20 sec)
+  - type: terminal
+    commands:
+      - "# Ever wanted to turn speech into text?"
+      - "# Let's build a REAL transcription app in 3 minutes"
+      - "echo 'Starting setup...'"
+      - "mkdir -p ~/transcriber && cd ~/transcriber"
+    duration: 20
+    description: "Hook viewers with what we're building - real app, fast"
+    transition_in: fade
+    transition_duration: 0.5
+    narration_hint: "Start with high energy - tell them exactly what they'll get"
+
+  # Scene 2: Terminal - Install dependencies live (30 sec)
+  - type: terminal
+    commands:
+      - "# First, install the AI model"
+      - "pip install openai -q"
+      - "# Now install Whisper - OpenAI's speech recognition"
+      - "pip install openai-whisper -q"
+      - "# Done! Let me show you..."
+    duration: 30
+    description: "Real installation - watch the packages install"
+    transition_in: wipe_left
+    transition_duration: 0.6
+    narration_hint: "Keep it moving - emphasize how simple this is"
+
+  # Scene 3: Terminal - Create the app (25 sec)
+  - type: terminal
+    commands:
+      - "# Now create the transcription script"
+      - "cat > transcribe.py << 'EOF'"
+      - "import whisper"
+      - "import sys"
+      - ""
+      - "# Load Whisper model"
+      - "model = whisper.load_model('base')"
+      - ""
+      - "# Transcribe audio file"
+      - "result = model.transcribe(sys.argv[1])"
+      - "print(result['text'])"
+      - "EOF"
+      - "# That's the entire app - only 8 lines!"
+    duration: 25
+    description: "Write the actual Python code live - show how simple it is"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "This is where they learn - explain each line briefly"
+
+  # Scene 4: Terminal - Test with real audio (30 sec)
+  - type: terminal
+    commands:
+      - "# Let's test it with a real audio file"
+      - "whisper audio_sample.mp3"
+      - "# Watch the AI transcribe in real-time..."
+      - "# That's it - full transcription!"
+    duration: 30
+    description: "Actually run Whisper and show it transcribing - this is the money shot"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "This is the payoff - show the magic happening"
+
+  # Scene 5: Browser - Show Whisper docs with highlights (25 sec)
+  - type: browser
+    url: "https://github.com/openai/whisper"
+    duration: 25
+    description: "Official Whisper repo - show this is production-grade tech"
+    highlight_elements:
+      - "h1"
+      - "article h1"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Build credibility - this is OpenAI's tech"
+
+  # Scene 6: Terminal - Advanced: real-time transcription (30 sec)
+  - type: terminal
+    commands:
+      - "# Want real-time transcription?"
+      - "# Just add the --model flag"
+      - "whisper microphone_input.wav --model base"
+      - "# Supports 90+ languages!"
+      - "whisper spanish_audio.mp3 --language es"
+    duration: 30
+    description: "Show advanced features - real-time, multiple languages"
+    transition_in: wipe_right
+    transition_duration: 0.6
+    narration_hint: "Show them the power - this is impressive"
+
+  # Scene 7: Browser - Show practical use cases (20 sec)
+  - type: article
+    url: "https://www.anthropic.com/index/claude"
+    duration: 20
+    description: "Show where transcription is useful - meetings, podcasts, accessibility"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Give them ideas - when would they use this?"
+
+  # Scene 8: Terminal - Final recap with CTA (20 sec)
+  - type: terminal
+    commands:
+      - "# In 3 minutes, you built:"
+      - "echo '- AI transcription app'"
+      - "echo '- Real-time speech to text'"
+      - "echo '- 90+ language support'"
+      - "# Subscribe for more AI tutorials!"
+    duration: 20
+    description: "Recap what they learned - strong finish with CTA"
+    transition_in: fade
+    transition_duration: 0.5
+    narration_hint: "End with energy - remind them of the value they got"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next up - Add AI-powered summarization to your transcription app"

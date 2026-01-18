@@ -1,0 +1,59 @@
+# Example: Multi-Article AI News Compilation
+# Combines multiple related news articles with transitions
+
+project_id: ai_news_weekly
+title: "This Week in AI: 5 Things You Missed"
+topic: "Weekly AI news roundup covering Claude, GPT, and developer tools"
+target_duration: 180
+overall_theme: news
+style: energetic
+
+scenes:
+  # Article 1: Lead story
+  - type: article
+    url: "https://www.anthropic.com/news"
+    duration: 35
+    description: "Anthropic's latest announcement"
+    transition_in: fade
+    transition_duration: 0.8
+    narration_hint: "Lead with the biggest story, build excitement immediately"
+
+  # Article 2: Related development
+  - type: article
+    url: "https://openai.com/blog"
+    duration: 30
+    description: "OpenAI's response or parallel development"
+    transition_in: wipe_left
+    transition_duration: 0.6
+    narration_hint: "Connect to the first story, show the competitive landscape"
+
+  # Article 3: Developer tools
+  - type: article
+    url: "https://github.blog"
+    duration: 30
+    description: "Developer tooling updates"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "Practical applications - what devs can use now"
+
+  # Article 4: Research breakthrough
+  - type: article
+    url: "https://huggingface.co/blog"
+    duration: 30
+    description: "Open source AI developments"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Community contributions, democratizing AI"
+
+  # Article 5: What's next
+  - type: article
+    url: "https://techcrunch.com/category/artificial-intelligence/"
+    duration: 35
+    description: "Industry predictions and what's coming"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "End with forward-looking content, leave them wanting more"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Subscribe to never miss a week - AI moves fast and you don't want to fall behind"

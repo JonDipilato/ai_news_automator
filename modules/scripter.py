@@ -1,10 +1,14 @@
 """
 Script generation module using Claude.
 Generates timed narration scripts that sync with recorded video.
+
+Supports two modes:
+- tutorial: Full educational content with learning objectives, concept explanations, and summaries
+- howto: Quick practical content with concise step-by-step instructions
 """
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 from dataclasses import dataclass, asdict
 import anthropic
 
@@ -12,6 +16,9 @@ from config.settings import (
     ANTHROPIC_API_KEY, CLAUDE_MODEL, MAX_SCRIPT_TOKENS,
     TEMPLATES_DIR, RECORDINGS_DIR
 )
+
+# Script generation modes
+ScriptMode = Literal["tutorial", "howto"]
 
 
 @dataclass
@@ -38,10 +45,18 @@ class GeneratedScript:
 class ScriptGenerator:
     """Generates narration scripts from video timestamps."""
 
-    def __init__(self):
+    def __init__(self, mode: ScriptMode = "tutorial"):
         self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        self.mode = mode
         self.intro_template = self._load_template("script_intro.txt")
         self.body_template = self._load_template("script_body.txt")
+
+        # Load mode-specific templates
+        self.tutorial_intro = self._load_template("tutorial_intro.txt")
+        self.tutorial_segment = self._load_template("tutorial_segment.txt")
+        self.tutorial_summary = self._load_template("tutorial_summary.txt")
+        self.howto_intro = self._load_template("howto_intro.txt")
+        self.howto_segment = self._load_template("howto_segment.txt")
 
     def _load_template(self, filename: str) -> str:
         """Load a prompt template."""
@@ -50,18 +65,28 @@ class ScriptGenerator:
             return template_path.read_text()
         return ""
 
-    def generate_from_timestamps(self, timestamps_file: str,
-                                  topic: Optional[str] = None) -> GeneratedScript:
+    def generate_from_timestamps(
+        self,
+        timestamps_file: str,
+        topic: Optional[str] = None,
+        mode: Optional[ScriptMode] = None,
+        educational_context: Optional[dict] = None
+    ) -> GeneratedScript:
         """
         Generate a narration script from recording timestamps.
 
         Args:
             timestamps_file: Path to timestamps JSON from recording
             topic: Optional topic override
+            mode: Script generation mode ("tutorial" or "howto")
+            educational_context: Optional dict with learning objectives, prerequisites, etc.
 
         Returns:
             GeneratedScript with timed segments
         """
+        # Use provided mode or default
+        script_mode = mode or self.mode
+
         # Load timestamps
         with open(timestamps_file) as f:
             timestamps_data = json.load(f)
@@ -74,13 +99,22 @@ class ScriptGenerator:
         # Build context for Claude
         actions_context = self._format_actions(actions)
 
-        # Generate script via Claude
-        prompt = self._build_script_prompt(
-            url=url,
-            duration=duration,
-            actions=actions_context,
-            topic=topic
-        )
+        # Generate script via Claude based on mode
+        if script_mode == "tutorial":
+            prompt = self._build_tutorial_prompt(
+                url=url,
+                duration=duration,
+                actions=actions_context,
+                topic=topic,
+                educational_context=educational_context
+            )
+        else:  # howto
+            prompt = self._build_howto_prompt(
+                url=url,
+                duration=duration,
+                actions=actions_context,
+                topic=topic
+            )
 
         response = self.client.messages.create(
             model=CLAUDE_MODEL,
@@ -118,6 +152,9 @@ class ScriptGenerator:
         """Build the prompt for script generation."""
         topic_context = f"Topic: {topic}\n" if topic else ""
 
+        # Calculate timing for hook (first 5-8 seconds spoken during first action)
+        hook_end_time = 8.0
+
         return f"""You're writing a YouTube tutorial script. Your job is to sound like a real person talking to a friend, not a robot or corporate presenter.
 
 {topic_context}URL being demonstrated: {url}
@@ -149,49 +186,75 @@ VOICE & STYLE RULES:
    - "Here's the thing"
    - Any phrase that sounds like a LinkedIn post
 
-3. HOOK FORMULA (first 5-10 seconds):
+3. HOOK FORMULA (first 5-8 seconds):
    - Start mid-thought like you're already talking
    - Create curiosity or call out a pain point
+   - THE HOOK IS THE OPENING - segments come AFTER the hook ends
    - Examples:
      * "Okay so I just found something that's gonna save you hours..."
      * "Bro. Why did nobody tell me about this earlier?"
      * "Stop doing it the hard way. There's a better move."
      * "You know that annoying thing where [problem]? Fixed."
 
-4. BODY STYLE:
+4. BODY STYLE (segments):
+   - CRITICAL: First segment starts AFTER the hook (at {hook_end_time} seconds, not 0)
+   - DO NOT repeat anything from the hook in the first segment
+   - The hook ends, then the first segment continues the flow naturally
    - Short punchy sentences. Like this. Keep it moving.
    - When showing a step: "Now watch this" or "Check this out" or "Here's the move"
    - When something works: "Boom." or "There it is." or "See that?"
    - Explain WHY not just what: "This matters because..."
    - Add personality: "I actually use this daily" or "This one's clutch"
 
-5. OUTRO (call-to-action):
-   - Keep it casual, not desperate
+5. OUTRO (call-to-action) - MUST BE ENGAGING:
+   - The outro is spoken at the END of the video, don't cut it short
+   - Include a clear call-to-action (subscribe, like, comment)
+   - Tease future content to keep them interested
+   - REQUIRED ELEMENTS:
+     * Wrap up what they learned (1 sentence)
+     * Call to action (subscribe/like)
+     * Future content tease
    - Examples:
-     * "If this helped, sub's free. More stuff like this coming."
-     * "Drop a comment if you want me to cover [related topic]"
-     * "Alright that's it. Go try it."
+     * "So now you know how to [thing]. If you want more stuff like this, hit subscribe - I drop new tutorials every week. Next up I'm covering [related topic]. Later."
+     * "That's the whole setup. Took me way too long to figure this out, so hopefully I saved you some time. Sub if you want more. Got a video on [topic] coming next. Peace."
+     * "And that's it - you're set up. Drop a comment if you have questions. Subscribe for more. I've got something even crazier coming next week. Stay tuned."
 
 OUTPUT FORMAT (JSON):
 {{
     "title": "Catchy YouTube title (use numbers, 'how to', or curiosity gaps)",
-    "hook": "Opening hook - mid-conversation energy, 5-10 seconds of speech",
+    "hook": "Opening hook - mid-conversation energy, spoken during seconds 0-{hook_end_time}",
     "segments": [
         {{
-            "start_time": 0.0,
-            "end_time": 5.0,
-            "text": "Natural narration for this segment",
+            "start_time": {hook_end_time},
+            "end_time": 15.0,
+            "text": "First segment - continues AFTER hook, NO repetition",
             "emphasis": "excited|normal|thoughtful"
+        }},
+        {{
+            "start_time": 15.0,
+            "end_time": 25.0,
+            "text": "Next segment...",
+            "emphasis": "normal"
         }}
     ],
-    "outro": "Casual CTA that doesn't sound needy"
+    "outro": "Full engaging outro with CTA, subscribe mention, and future content tease (spoken during final 10-15 seconds)"
 }}
 
 TIMING RULES:
+- Hook: 0 to {hook_end_time} seconds
+- First segment: starts at {hook_end_time} seconds (NOT at 0!)
 - Each segment: 5-15 seconds of speech
 - Leave 1-2s pauses during complex visuals (let them breathe)
+- Outro: final 10-15 seconds of the video
 - Total speech: ~80% of video duration
 - Match energy to what's happening on screen
+
+CRITICAL CHECKLIST BEFORE GENERATING:
+[ ] Hook starts at 0, ends around {hook_end_time}s
+[ ] First segment starts at {hook_end_time}s, NOT at 0
+[ ] First segment does NOT repeat anything from the hook
+[ ] Outro includes: summary + subscribe CTA + future tease
+[ ] No banned AI phrases used
 
 Generate the JSON script. Sound like a real YouTuber, not a tutorial bot:"""
 

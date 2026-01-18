@@ -1,0 +1,129 @@
+# Web Scraping Tutorial - REAL scraping, no mockups
+# Scrapes real data from a real website
+
+project_id: web_scraper_real
+title: "Scrape Any Website in Python (REAL Demo)"
+topic: "Build a web scraper from scratch that extracts real data from websites - using BeautifulSoup and requests"
+target_duration: 180
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Browser - Show what we're scraping (a real website)
+  - type: browser
+    url: "https://quotes.toscrape.com/"
+    duration: 20
+    description: "Target website - quotes.toscrape.com, a site made for scraping practice"
+    transition_in: fade
+    transition_duration: 0.5
+    narration_hint: "Show the target website - this is what we'll extract data from"
+
+  # Scene 2: Terminal - Set up the project
+  - type: terminal
+    commands:
+      - "# Let's build a real web scraper"
+      - "mkdir -p ~/web_scraper && cd ~/web_scraper"
+      - "# Install the libraries we need"
+      - "pip3 install requests beautifulsoup4 -q"
+      - "# Libraries installed!"
+    duration: 25
+    description: "Create project and install scraping libraries"
+    transition_in: wipe_left
+    transition_duration: 0.6
+    narration_hint: "Show real installation happening - these are real Python packages"
+
+  # Scene 3: Terminal - Create the scraper step by step
+  - type: terminal
+    commands:
+      - "# Create our scraper script"
+      - "cat > scraper.py << 'EOF'"
+      - "import requests"
+      - "from bs4 import BeautifulSoup"
+      - "import json"
+      - ""
+      - "# URL to scrape"
+      - "url = 'https://quotes.toscrape.com'"
+      - ""
+      - "# Fetch the page"
+      - "response = requests.get(url)"
+      - "print(f'Status: {response.status_code}')"
+      - ""
+      - "# Parse HTML"
+      - "soup = BeautifulSoup(response.text, 'html.parser')"
+      - ""
+      - "# Extract quotes"
+      - "quotes = []"
+      - "for quote in soup.find_all('div', class_='quote'):"
+      - "    text = quote.find('span', class_='text').text"
+      - "    author = quote.find('small', class_='author').text"
+      - "    quotes.append({'quote': text, 'author': author})"
+      - ""
+      - "# Save to JSON"
+      - "with open('quotes.json', 'w') as f:"
+      - "    json.dump(quotes, f, indent=2)"
+      - ""
+      - "print(f'Extracted {len(quotes)} quotes!')"
+      - "print('Saved to quotes.json')"
+      - "EOF"
+      - "# Script created - now let's run it!"
+    duration: 40
+    description: "Write the actual scraper code - imports, fetching, parsing, saving"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Walk through each part - import, fetch, parse, save"
+
+  # Scene 4: Terminal - Run the scraper and show REAL output
+  - type: terminal
+    commands:
+      - "# Run our scraper"
+      - "python3 scraper.py"
+      - "# It worked! Let's see what we extracted"
+      - "cat quotes.json | head -30"
+      - "# Real data extracted from a real website!"
+    duration: 25
+    description: "Actually run the scraper and show the real extracted data"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "This is the payoff - show the real data we extracted"
+
+  # Scene 5: Terminal - Show more data and explain
+  - type: terminal
+    commands:
+      - "# Let's see all the quotes we got"
+      - "python3 -c \"import json; quotes=json.load(open('quotes.json')); print('Total quotes:', len(quotes)); [print(f'\\n{q[\\\"author\\\"]}: {q[\\\"quote\\\"][:50]}...') for q in quotes[:5]]\""
+      - "# Each quote has text and author"
+      - "# We scraped this from a LIVE website!"
+    duration: 25
+    description: "Display the scraped data formatted nicely"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Show the structured data - this is what scraping does"
+
+  # Scene 6: Browser - Show BeautifulSoup documentation
+  - type: browser
+    url: "https://www.crummy.com/software/BeautifulSoup/bs4/doc/"
+    duration: 20
+    description: "BeautifulSoup docs - the tool we used"
+    transition_in: wipe_right
+    transition_duration: 0.6
+    narration_hint: "Show this is a real library used by millions"
+
+  # Scene 7: Terminal - Recap and show the code one more time
+  - type: terminal
+    commands:
+      - "# In 3 minutes, we built:"
+      - "echo '✓ Web scraper from scratch'"
+      - "echo '✓ Extracted real data from live website'"
+      - "echo '✓ Saved data to JSON file'"
+      - "echo '✓ Only 25 lines of code!'"
+      - "wc -l scraper.py"
+      - "# Run it yourself: cd ~/web_scraper && python3 scraper.py"
+    duration: 20
+    description: "Recap what was accomplished"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Summarize the value - quick, simple, powerful"
+
+outro_style: hype
+include_subscribe_cta: true
+next_video_tease: "Next up - scrape Amazon product data and track prices automatically"

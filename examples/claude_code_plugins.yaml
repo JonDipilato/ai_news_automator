@@ -1,0 +1,80 @@
+# Example: Claude Code Plugins Tutorial
+# This manifest creates an engaging multi-scene tutorial video
+
+project_id: claude_code_plugins_demo
+title: "Install Claude Code Plugins in 60 Seconds"
+topic: "How to install and use Claude Code plugins for supercharged AI coding"
+target_duration: 90
+overall_theme: tutorial
+style: energetic
+
+scenes:
+  # Scene 1: Terminal - Open Claude Code
+  - type: terminal
+    commands:
+      - "cd ~/projects/my-app"
+      - "source venv/bin/activate"
+      - "claude"
+    duration: 12
+    description: "Opening Claude Code in a virtual environment - quick and easy"
+    transition_in: fade
+    transition_duration: 0.5
+    narration_hint: "Show how simple the setup is, build excitement"
+
+  # Scene 2: Browser - Show the plugins article/docs
+  - type: browser
+    url: "https://github.com/anthropics/claude-code"
+    duration: 15
+    description: "Quick look at the Claude Code repo and where to find plugins"
+    highlight_elements:
+      - "h1"
+      - ".markdown-body h2"
+    transition_in: zoom_in
+    transition_duration: 0.7
+    narration_hint: "Point out where to find plugin info, keep it moving"
+
+  # Scene 3: Terminal - Install a plugin
+  - type: terminal
+    commands:
+      - "/plugins"
+      - "/plugins install superclaude"
+    duration: 20
+    description: "Installing the SuperClaude plugin live"
+    transition_in: wipe_left
+    transition_duration: 0.5
+    narration_hint: "This is the magic moment - show the install happening"
+
+  # Scene 4: Terminal - Demo the plugin
+  - type: terminal
+    commands:
+      - "/sc help"
+      - "/sc analyze"
+    duration: 18
+    description: "Demonstrating what the plugin can do"
+    transition_in: slide_left
+    transition_duration: 0.5
+    narration_hint: "Show off the capabilities, get viewers excited"
+
+  # Scene 5: Browser - Show more resources (optional article)
+  - type: article
+    url: "https://docs.anthropic.com/en/docs/claude-code"
+    duration: 15
+    description: "Quick scroll through the official docs for more info"
+    transition_in: crossfade
+    transition_duration: 0.8
+    narration_hint: "Direct them to resources, build authority"
+
+  # Scene 6: Terminal - Final demonstration
+  - type: terminal
+    commands:
+      - "/sc implement add dark mode toggle"
+      - "# Watch the magic happen..."
+    duration: 10
+    description: "One more cool demo to leave them impressed"
+    transition_in: zoom_in
+    transition_duration: 0.6
+    narration_hint: "End on a high note before the outro"
+
+outro_style: casual
+include_subscribe_cta: true
+next_video_tease: "Next up - my top 5 Claude Code workflows that save me hours"

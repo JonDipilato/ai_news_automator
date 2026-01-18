@@ -46,7 +46,7 @@ CLAUDE_MODEL = "claude-sonnet-4-20250514"
 MAX_SCRIPT_TOKENS = 4096
 
 # Recording settings
-RECORDING_FORMAT = "webm"
+RECORDING_FORMAT = "mp4"
 DEFAULT_RECORDING_DURATION = 300  # 5 minutes max
 
 # YouTube settings
